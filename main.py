@@ -1,10 +1,27 @@
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware ##프론트와 연결 위한 CORS설정 
 from routers import musicgen_upload_router
 from config import OUTPUT_DIR, FINAL_MIX_NAME
 import os
 
 app = FastAPI(title="Readning API", version="1.0") #FastAPI 서버 호출
+
+#  origins = [
+#     " 페이지 도메인 ",
+#     " 프론트 페이지 도메인 ",
+#     - 등 -
+#     ]
+# 
+## 프론트에서 접근하는 모든 도메인 허용. 개발자에 따라 특정 출처만 허용할 수 있음.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 모든 도메인 허용 (개발용) / 보안 강화 시 도메인 지정
+    allow_credentials=True,
+    allow_methods=["*"],  # GET, POST 등 모든 HTTP 메서드 허용
+    allow_headers=["*"],  # 모든 헤더 허용
+)
+
 
 app.include_router(musicgen_upload_router.router)
 
