@@ -9,10 +9,14 @@ router = APIRouter(prefix="/generate", tags = ["UploadWorkflow"])
 
 @router.post("/music")
 
-def generate_music_from_upload(file : UploadFile = File (...)):
+def generate_music_from_upload(
+    file : UploadFile = File (...),
+    book_id: str = Form(...),
+    page: int = Form(...)
+    ):
     text = file.file.read().decode("utf-8") #사용자로부터 text파일 
 
-    save_text_to_file(os.path.join(OUTPUT_DIR,"uploaded"),text)
+    save_text_to_file(os.path.join(OUTPUT_DIR,"uploaded",f"{book_id}_ch{page}.txt"), text)
 
     global_prompt = prompt_service.generate_global(text)
     chunks = emotion_service.hybrid_chunk_text_by_emotion_fulltext(text)
@@ -25,14 +29,19 @@ def generate_music_from_upload(file : UploadFile = File (...)):
 
 
     musicgen_service.generate_music_samples(global_prompt = global_prompt, regional_prompts = regional_prompts)
+    
+    output_filename = f"ch{page}.wav"
 
     merge_service.build_and_merge_clips_with_repetition(
         text_chunks=chunks,
         clip_dir=OUTPUT_DIR,
-        output_name=FINAL_MIX_NAME,
+        output_name=output_filename,
         clip_duration=GEN_DURATION,
         total_duration=TOTAL_DURATION,
         fade_ms=1500
     )
 
-    return {"message": "Music generated", "download_url": "/download"}
+    return {
+       "message": "Music generated",
+        "download_url": f"/{OUTPUT_DIR}/{book_id}/ch{page}.wav"
+    }
