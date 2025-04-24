@@ -46,4 +46,7 @@ def build_and_merge_clips_with_repetition(
 
     delete_files_in_directory(clip_dir, extension=".wav", exclude_files=[output_name])
 
+    # ✅ 완료 로그 추가
+    print(f"[✓] Merging finished → {output_path}")
+
     return output_path
