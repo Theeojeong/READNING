@@ -6,7 +6,8 @@ from utils.file_utils import delete_files_in_directory
 
 def build_and_merge_clips_with_repetition(
         text_chunks : list[str],
-        clip_dir : str,
+        base_output_dir : str,
+        book_id_dir : str,
         output_name : str,
         clip_duration : int ,
         total_duration : int ,
@@ -28,7 +29,7 @@ def build_and_merge_clips_with_repetition(
     full_track = AudioSegment.silent(duration=0)
 
     for i, repeat_count in enumerate(raw_repeats):
-        clip_path = os.path.join(clip_dir, f"regional_output_{i+1}.wav")
+        clip_path = os.path.join(base_output_dir, book_id_dir, f"regional_output_{i+1}.wav")
         if not os.path.exists(clip_path):
             print(f"⚠️ {clip_path} not found, skipping.")
             continue
@@ -41,10 +42,11 @@ def build_and_merge_clips_with_repetition(
             else:
                 full_track += clip.fade_in(fade_ms)
 
-    output_path = os.path.join(clip_dir, output_name)
+    output_path = os.path.join(base_output_dir, book_id_dir, output_name)
     full_track.export(output_path, format="wav")
 
-    delete_files_in_directory(clip_dir, extension=".wav", exclude_files=[output_name])
+    clip_dir_path = os.path.join(base_output_dir, book_id_dir)
+    delete_files_in_directory(clip_dir_path, extension=".wav", exclude_files=[output_name])
 
     # ✅ 완료 로그 추가
     print(f"[✓] Merging finished → {output_path}")
