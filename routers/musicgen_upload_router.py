@@ -28,18 +28,24 @@ def generate_music_from_upload(
         regional_prompts.append(musicgen_prompt)
 
 
-    musicgen_service.generate_music_samples(global_prompt = global_prompt, regional_prompts = regional_prompts)
+    musicgen_service.generate_music_samples(
+        global_prompt = global_prompt,
+        regional_prompts = regional_prompts,
+        book_id_dir = book_id
+        )
     
     output_filename = f"ch{page}.wav"
 
     merge_service.build_and_merge_clips_with_repetition(
         text_chunks=chunks,
-        clip_dir=OUTPUT_DIR,
+        base_output_dir=OUTPUT_DIR,
+        book_id_dir = book_id,
         output_name=output_filename,
         clip_duration=GEN_DURATION,
         total_duration=TOTAL_DURATION,
         fade_ms=1500
     )
+
 
     return {
        "message": "Music generated",
@@ -163,7 +169,8 @@ def generate_music_from_upload_v2(
         # 4) MusicGen 생성
         musicgen_service.generate_music_samples(
             global_prompt=global_prompt,
-            regional_prompts=music_prompts
+            regional_prompts=music_prompts,
+            book_id_dir = book_id
         )
 
         # 5) WAV 병합
@@ -171,7 +178,8 @@ def generate_music_from_upload_v2(
         ensure_dir(os.path.join(OUTPUT_DIR, book_id))
         merge_service.build_and_merge_clips_with_repetition(
             text_chunks=chunks,
-            clip_dir=OUTPUT_DIR,
+            base_output_dir=OUTPUT_DIR,
+            book_id_dir = book_id,
             output_name=f"{book_id}/{output_filename}",
             clip_duration=GEN_DURATION,
             total_duration=TOTAL_DURATION,
