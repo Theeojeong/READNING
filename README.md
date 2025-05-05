@@ -36,8 +36,9 @@ pip install -r requirements.txt
 
 
 # 1-1 ollama 서버 실행 및 모델 다운로드
-a. curl -fsSL https://ollama.com/install.sh | sh 
-b. py 파일 생성 후 아래 내용 복붙 및 실행
+
+a. curl -fsSL https://ollama.com/install.sh | sh
+b. .py 파일 생성 후 아래 내용 복붙 및 실행
 import subprocess
 import time
 
@@ -50,10 +51,12 @@ time.sleep(5)
 
 print("Ollama server launched with PID:", proc.pid)
 
-c. 다른 터미널에서 ollama pull gemma3:4b
+c. 다른 터미널에서 ollama pull gemma3:4b 실행
 
 # 2. 서버 실행 ### 변경 가능성 있음
 uvicorn main:app --reload --root-path /proxy/8000
+혹은
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload --root-path /proxy/8000
 
 # 3. Swagger UI 접속
 http://localhost:8000/docs
