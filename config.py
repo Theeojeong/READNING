@@ -2,8 +2,8 @@
 from pydantic_settings import BaseSettings
 
 OUTPUT_DIR = "gen_musics"
-GEN_DURATION = 3
-TOTAL_DURATION = 10
+GEN_DURATION = 10
+TOTAL_DURATION = 30
 FINAL_MIX_NAME = "final_mix.wav"
 
 # ── 고정 상수 ─────────────────────────────
@@ -14,9 +14,9 @@ CHUNK_PREVIEW_LEN  = 300    # 디버그용 텍스트 미리보기 길이
 # ── 환경별로 바뀔 수 있는 값 ───────────────
 class Settings(BaseSettings):
     MODEL_NAME: str = "gemma3:4b"
-    DEBUG: bool = False
-    LOG_LLM_RESPONSES: bool = False
-    PRINT_CHUNK_TEXT: bool = False
+    DEBUG: bool = True
+    LOG_LLM_RESPONSES: bool = True
+    PRINT_CHUNK_TEXT: bool = True
 
     class Config:
         env_file = ".env"          # 같은 폴더의 .env 읽어들임

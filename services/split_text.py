@@ -1,11 +1,24 @@
-import nltk
+import nltk, os
 from pprint import pprint
 from config import MAX_SEGMENT_SIZE, OVERLAP_SIZE
 from typing import Generator, Tuple
 from nltk.tokenize import sent_tokenize
 from utils.logger import log
 
-nltk.download('punkt')
+NLTK_DIR = os.path.join(os.path.dirname(__file__), "..", "nltk_data")
+nltk.data.path.append(NLTK_DIR)      # 프로젝트 안 캐시 경로 추가
+
+def ensure_punkt() -> None:
+    """punkt 토크나이저가 없으면 다운로드한다(최초 1회)."""
+    try:
+        nltk.data.find("tokenizers/punkt")
+        print("NLTK 'punkt' 확인 완료.")
+    except LookupError:
+        print("NLTK 'punkt' 다운로드 중...")
+        nltk.download("punkt", download_dir=NLTK_DIR, quiet=True)
+        print("NLTK 'punkt' 다운로드 완료.")
+
+ensure_punkt() 
 
 def split_text_into_processing_segments(text: str) -> Generator[Tuple[str, int], None, None]:
     

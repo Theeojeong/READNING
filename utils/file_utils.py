@@ -1,5 +1,6 @@
 # utils/file_utils.py
 import os
+import re, unicodedata
 from pathlib import Path
 
 def save_text_to_file(path: str, text: str) -> None:
@@ -27,3 +28,15 @@ def delete_files_in_directory(path: str, extension: str = ".wav", exclude_files:
         if filename.endswith(extension) and filename not in exclude_files:
             os.remove(os.path.join(path, filename))
 
+def secure_filename(name: str) -> str:
+    """
+    공백·한글·특수문자를 언더스코어/영문자로 치환해
+    파일 시스템과 URL 모두 안전한 문자열로 변환.
+    """
+    name = (
+        unicodedata.normalize("NFKD", name)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    )
+    name = re.sub(r"[^\w.-]+", "_", name)  # 영문·숫자·._ 만 남김
+    return name.strip("._") or "file"

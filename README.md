@@ -28,8 +28,35 @@
 # 1. 의존성 설치
 pip install -r requirements.txt
 
+혹은 직접 설치
+
+1. pip install pydantic_settings audiocraft fastapi ollama nltk torchaudio numpy==1.26.3
+2. sudo apt-get update
+3. sudo apt-get install ffmpeg -y
+
+
+# 1-1 ollama 서버 실행 및 모델 다운로드
+
+a. curl -fsSL https://ollama.com/install.sh | sh
+b. .py 파일 생성 후 아래 내용 복붙 및 실행
+import subprocess
+import time
+
+# Ollama 서버를 백그라운드에서 실행합니다.
+# stdout과 stderr는 필요한 경우 캡처할 수 있습니다.
+proc = subprocess.Popen(["ollama", "serve"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+# 서버가 완전히 시작될 때까지 잠시 대기 (예: 5초)
+time.sleep(5)
+
+print("Ollama server launched with PID:", proc.pid)
+
+c. 다른 터미널에서 ollama pull gemma3:4b 실행
+
 # 2. 서버 실행 ### 변경 가능성 있음
-uvicorn main:app --reload
+uvicorn main:app --reload --root-path /proxy/8000
+혹은
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload --root-path /proxy/8000
 
 # 3. Swagger UI 접속
 http://localhost:8000/docs
