@@ -21,3 +21,8 @@ gen_musics/
 
 # Logs & misc
 *.log
+
+# ignore generated audio
+gen_musics/
+*.wav
+*.env
