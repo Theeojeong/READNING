@@ -12,12 +12,13 @@ app = FastAPI(title="Readning API", version="1.0") #FastAPI 서버 호출
 #     " 프론트 페이지 도메인 ",
 #     - 등 -
 #     ]
-# 
-## 프론트에서 접근하는 모든 도메인 허용. 개발자에 따라 특정 출처만 허용할 수 있음.
+
+# # 프론트에서 접근하는 모든 도메인 허용. 개발자에 따라 특정 출처만 허용할 수 있음.
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # 모든 도메인 허용 (개발용) / 보안 강화 시 도메인 지정
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],  # GET, POST 등 모든 HTTP 메서드 허용
     allow_headers=["*"],  # 모든 헤더 허용
 )
