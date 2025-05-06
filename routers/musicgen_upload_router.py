@@ -4,6 +4,7 @@ from utils.file_utils import save_text_to_file, ensure_dir
 import json, os
 from config import OUTPUT_DIR, FINAL_MIX_NAME, GEN_DURATION, TOTAL_DURATION
 from typing import List
+from pathlib import Path 
 
 
 router = APIRouter(prefix="/generate", tags = ["UploadWorkflow"])
@@ -127,6 +128,7 @@ async def generate_music_from_upload_v3(
     """
     # ── 1) 텍스트 읽기 ─────────────────────────────────────────────
     text = file.file.read().decode("utf-8")
+    original_stem = Path(file.filename).stem    
     if not text:
         raise HTTPException(400, "업로드된 파일이 비어 있습니다.")
 
@@ -170,8 +172,11 @@ async def generate_music_from_upload_v3(
     )
 
     # ── 6) WAV 병합 ──────────────────────────────────────────────
+    # ensure_dir(os.path.join(OUTPUT_DIR, book_id))
+    # output_filename = FINAL_MIX_NAME  # config.py 의 "final_mix.wav"
     ensure_dir(os.path.join(OUTPUT_DIR, book_id))
-    output_filename = FINAL_MIX_NAME  # config.py 의 "final_mix.wav"
+    output_filename = f"{book_id}_{original_stem}_final_mix.wav"
+
     merge_service.build_and_merge_clips_with_repetition(
         text_chunks=chunks,
         base_output_dir=OUTPUT_DIR,
