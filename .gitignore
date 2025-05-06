@@ -26,3 +26,7 @@ gen_musics/
 gen_musics/
 *.wav
 *.env
+
+
+# Ignore local nltk cache
+nltk_data/

@@ -3,6 +3,12 @@ from services import analyze_emotions_with_gpt, chunk_text_by_emotion, prompt_se
 from utils.file_utils import save_text_to_file, ensure_dir
 import os
 from config import OUTPUT_DIR, FINAL_MIX_NAME, GEN_DURATION, TOTAL_DURATION
+<<<<<<< Updated upstream
+=======
+from typing import List
+from pathlib import Path 
+from services.repeat_track import repeat_clips_to_length
+>>>>>>> Stashed changes
 
 
 router = APIRouter(prefix="/generate", tags = ["UploadWorkflow"])
@@ -110,3 +116,181 @@ def generate_music_from_upload_v2(
     except Exception as e:
         print("❌ music-v2 오류:", e)
         raise HTTPException(500, "음악 생성 중 오류가 발생했습니다.")
+<<<<<<< Updated upstream
+=======
+
+
+@router.post("/music-v3")
+async def generate_music_from_upload_v3(
+    file: UploadFile = File(...),
+    book_id: str = Form(...),
+    # 프런트에서 JSON 배열을 문자열로 보내도록 합의
+    #   e.g.  ["잔잔한 피아노","자연 소리"]
+    preference: str = Form("[]"),
+):
+    """
+    page 파라미터를 없애고 사용자의 음악 취향(preference)을 받는 새 버전.
+    preference는 JSON 배열 문자열로 전달받아 List[str]으로 변환해 사용한다.
+    """
+    # ── 1) 텍스트 읽기 ─────────────────────────────────────────────
+    text = file.file.read().decode("utf-8")
+    original_stem = Path(file.filename).stem    
+    if not text:
+        raise HTTPException(400, "업로드된 파일이 비어 있습니다.")
+
+    # ★ 챕터 전용 하위 폴더 경로
+    chapter_dir = f"{book_id}/{original_stem}"        # ex) "string/ch01"
+    ensure_dir(os.path.join(OUTPUT_DIR, chapter_dir))
+
+    uploaded_path = os.path.join(OUTPUT_DIR, "uploaded", f"{chapter_dir}.txt")
+    save_text_to_file(uploaded_path, text)
+
+    tmp_path = os.path.join(
+        OUTPUT_DIR, "uploaded", f"{chapter_dir}_tmp.txt")
+    save_text_to_file(tmp_path, text)
+
+    # ── 2) preference 파싱 ───────────────────────────────────────
+    try:
+        pref_list: List[str] = json.loads(preference)
+        if not isinstance(pref_list, list):
+            raise ValueError
+    except Exception:
+        raise HTTPException(400, "preference 는 JSON 배열 형식이어야 합니다")
+
+    # ── 3) 감정-청크 분할 ─────────────────────────────────────────
+    tmp_path = os.path.join(OUTPUT_DIR, "uploaded", f"{book_id}_tmp.txt")
+    save_text_to_file(tmp_path, text)
+    chunks = chunk_text_by_emotion.chunk_text_by_emotion(tmp_path)
+    print(f"청크 개수: {len(chunks)}")
+
+    # ── 4) 프롬프트 생성 (취향 반영) ───────────────────────────────
+    global_prompt = prompt_service.generate_global(text)
+    music_prompts = []
+    for chunk in chunks:  # chunk 가 튜플이면 (chunk_text, ctx)
+        chunk_text = chunk[0] if isinstance(chunk, (list, tuple)) else chunk
+        regional = prompt_service.generate_regional(chunk_text)
+
+        # 취향을 한 줄 덧붙여서 compose
+        pref_line = f"User preference: {', '.join(pref_list)}" if pref_list else ""
+        music_prompts.append(
+            prompt_service.compose_musicgen_prompt(
+                global_prompt, f"{regional}\n{pref_line}"
+            )
+        )
+
+    # ── 5) MusicGen 샘플 생성 ────────────────────────────────────
+    musicgen_service.generate_music_samples(
+        global_prompt=global_prompt,
+        regional_prompts=music_prompts,
+        book_id_dir=chapter_dir,
+    )
+
+    # ── 6) WAV 병합 ──────────────────────────────────────────────
+    # ensure_dir(os.path.join(OUTPUT_DIR, book_id))
+    # output_filename = FINAL_MIX_NAME  # config.py 의 "final_mix.wav"
+    ensure_dir(os.path.join(OUTPUT_DIR, book_id))
+    output_filename = f"{book_id}_{original_stem}_final_mix.wav"
+
+    merge_service.build_and_merge_clips_with_repetition(
+        text_chunks=chunks,
+        base_output_dir=OUTPUT_DIR,
+        book_id_dir=chapter_dir,
+        output_name=output_filename,
+        clip_duration=GEN_DURATION,
+        total_duration=TOTAL_DURATION,
+        fade_ms=1500,
+    )
+
+    return {
+        "message": "Music generated (v3)",
+        "download_url": f"/{OUTPUT_DIR}/{chapter_dir}/{output_filename}",
+    }
+
+
+@router.post("/music-v3-long")                                  # ★ 새 엔드포인트
+async def generate_music_long(
+    file: UploadFile = File(...),
+    book_id: str = Form(...),
+    preference: str = Form("[]"),
+    target_len: int = Form(240)     # 기본 4분, 필요하면 폼에서 바꿀 수 있음
+):
+    """
+    - /music-v3 로직 그대로 수행
+    - regional_output_*.wav 병합 후
+    - repeat_clips_to_length() 로 target_len 초까지 반복-패딩
+    """
+    # ── 1) 텍스트 읽기 ───────────────────────────────────────────
+    text = file.file.read().decode("utf-8")
+    original_stem = Path(file.filename).stem
+    if not text:
+        raise HTTPException(400, "업로드된 파일이 비어 있습니다.")
+
+    # ── 2) 챕터 전용 폴더 준비 ───────────────────────────────────
+    chapter_dir = f"{book_id}/{original_stem}"       # ex) string/ch01
+    ensure_dir(os.path.join(OUTPUT_DIR, chapter_dir))
+
+    # 저장용 파일 경로
+    uploaded_path = os.path.join(
+        OUTPUT_DIR, "uploaded", f"{chapter_dir}.txt")
+    tmp_path = os.path.join(
+        OUTPUT_DIR, "uploaded", f"{chapter_dir}_tmp.txt")
+    save_text_to_file(uploaded_path, text)
+    save_text_to_file(tmp_path, text)
+
+    # ── 3) preference 파싱 ──────────────────────────────────────
+    try:
+        pref_list: List[str] = json.loads(preference)
+        if not isinstance(pref_list, list):
+            raise ValueError
+    except Exception:
+        raise HTTPException(400, "preference 는 JSON 배열 형식이어야 합니다")
+
+    # ── 4) 감정-청크 분할 ────────────────────────────────────────
+    chunks = chunk_text_by_emotion.chunk_text_by_emotion(tmp_path)
+    print(f"청크 개수: {len(chunks)}")
+
+    # ── 5) 프롬프트 & MusicGen ─────────────────────────────────
+    global_prompt = prompt_service.generate_global(text)
+    music_prompts = []
+    for chunk in chunks:
+        chunk_txt = chunk[0] if isinstance(chunk, (list, tuple)) else chunk
+        regional = prompt_service.generate_regional(chunk_txt)
+        pref_line = f"User preference: {', '.join(pref_list)}" if pref_list else ""
+        music_prompts.append(
+            prompt_service.compose_musicgen_prompt(
+                global_prompt, f"{regional}\n{pref_line}"
+            )
+        )
+
+    musicgen_service.generate_music_samples(
+        global_prompt=global_prompt,
+        regional_prompts=music_prompts,
+        book_id_dir=chapter_dir,
+    )
+
+    # ── 6) 1차 병합 (30 s × N) ─────────────────────────────────
+    output_filename = f"{original_stem}_final_mix.wav"
+    merge_service.build_and_merge_clips_with_repetition(
+        text_chunks=chunks,
+        base_output_dir=OUTPUT_DIR,
+        book_id_dir=chapter_dir,
+        output_name=output_filename,
+        clip_duration=GEN_DURATION,
+        total_duration=target_len,     # 1차 제한은 대략 길이 계산용
+        fade_ms=1500,
+    )
+
+    # ── 7) 4 분까지 반복-패딩 ───────────────────────────────────
+    repeat_clips_to_length(
+        folder=os.path.join(OUTPUT_DIR, chapter_dir),
+        base_name="regional_output_",      # regional_output_1.wav …
+        clip_duration=GEN_DURATION,
+        target_sec=target_len,
+        output_name=output_filename,       # 같은 이름 덮어쓰기
+    )
+
+    return {
+        "message": f"Music generated (v3-long, {target_len}s)",
+        "download_url": f"/{OUTPUT_DIR}/{chapter_dir}/{output_filename}",
+    }
+>>>>>>> Stashed changes
