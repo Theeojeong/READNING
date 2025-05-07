@@ -5,7 +5,7 @@ from typing import Dict, Any
 from utils.logger import log, log_raw_llm_response
 from config import MODEL_NAME
 from services.get_emotion_analysis_prompt import get_emotion_analysis_prompt
-from services.sanitize_llm_output import clean_json
+from services.clean_json import clean_json
 
 # ──────────────────────────────────────────────────────────────
 # <감정 분석 호출>

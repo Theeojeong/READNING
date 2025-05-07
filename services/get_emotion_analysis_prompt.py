@@ -12,23 +12,58 @@
 # ──────────────────────────────────────────────────────────────
 import re
 
+import re
+
 def get_emotion_analysis_prompt(segment: str) -> str:
     return f"""
-You must return a SINGLE JSON object describing emotional phases in valid JSON (no markdown).
-Use only standard double quotes. Return nothing else.
-If you cannot comply, return {{"emotional_phases":[]}}.
-TEXT SEGMENT:
+You are assisting an audio-engine pipeline that adds background music to a story.
+Your task is to detect emotionally meaningful turning points so the music can change
+exactly when the reader's feelings shift.
+
+⚠️  Output MUST be a single valid JSON object (NO markdown), or:
+     {{"emotional_phases":[]}} if you cannot comply.
+
+For each turning point include:
+- start_text       : a short quotation (≤ 60 chars) starting at the transition
+- emotions_before  : main feelings just BEFORE (comma-separated, ≤ 3)
+- emotions_after   : main feelings just AFTER  (comma-separated, ≤ 3)
+- significance     : 1 (low) to 5 (high) — how strongly the reader’s emotion changes
+- explanation      : 1 short sentence (≤ 25 words) why this moment matters musically
+
+TEXT SEGMENT (max 2600 chars):
 {segment}
-Return ONE JSON of the form:
+
+Return exactly ONE JSON in this schema:
 {{
   "emotional_phases":[
     {{
       "start_text":"",
-      "emotions_before":"",  
-      "emotions_after":"",  
-      "significance":0,       
-      "explanation":""        
+      "emotions_before":"",
+      "emotions_after":"",
+      "significance":0,
+      "explanation":""
     }}
   ]
 }}
 """.strip()
+
+# def get_emotion_analysis_prompt(segment: str) -> str:
+#     return f"""
+# You must return a SINGLE JSON object describing emotional phases in valid JSON (no markdown).
+# Use only standard double quotes. Return nothing else.
+# If you cannot comply, return {{"emotional_phases":[]}}.
+# TEXT SEGMENT:
+# {segment}
+# Return ONE JSON of the form:
+# {{
+#   "emotional_phases":[
+#     {{
+#       "start_text":"",
+#       "emotions_before":"",  
+#       "emotions_after":"",  
+#       "significance":0,       
+#       "explanation":""        
+#     }}
+#   ]
+# }}
+# """.strip()

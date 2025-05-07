@@ -33,12 +33,10 @@ pip install -r requirements.txt
 1. pip install pydantic_settings audiocraft fastapi ollama nltk torchaudio numpy==1.26.3
 2. sudo apt-get update && sudo apt-get install ffmpeg -y
 
-
 # 2. ollama 서버 실행 및 모델 다운로드
-
 a. curl -fsSL https://ollama.com/install.sh | sh
 b. ollama_run.py 파일 실행해서 ollama 서버 오픈
-c. ollama pull llama3.2 실행 후 모델 다운로드 + gemma3:4b 모델도 다운로드
+c. ollama pull gemma3:12b 모델 다운로드 -> A100 2g-20GB 인스턴스 이상
 
 # 3. 서버 실행 (변경 가능성 있음)
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload --root-path /proxy/8000
