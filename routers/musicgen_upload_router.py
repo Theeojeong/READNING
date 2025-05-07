@@ -1,14 +1,12 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from services import analyze_emotions_with_gpt, chunk_text_by_emotion, prompt_service, musicgen_service, emotion_service, merge_service, split_text
 from utils.file_utils import save_text_to_file, ensure_dir
-import os
+import json, os
 from config import OUTPUT_DIR, FINAL_MIX_NAME, GEN_DURATION, TOTAL_DURATION
-<<<<<<< Updated upstream
-=======
 from typing import List
 from pathlib import Path 
 from services.repeat_track import repeat_clips_to_length
->>>>>>> Stashed changes
+
 
 
 router = APIRouter(prefix="/generate", tags = ["UploadWorkflow"])
@@ -116,8 +114,6 @@ def generate_music_from_upload_v2(
     except Exception as e:
         print("❌ music-v2 오류:", e)
         raise HTTPException(500, "음악 생성 중 오류가 발생했습니다.")
-<<<<<<< Updated upstream
-=======
 
 
 @router.post("/music-v3")
@@ -293,4 +289,4 @@ async def generate_music_long(
         "message": f"Music generated (v3-long, {target_len}s)",
         "download_url": f"/{OUTPUT_DIR}/{chapter_dir}/{output_filename}",
     }
->>>>>>> Stashed changes
+

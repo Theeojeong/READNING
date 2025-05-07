@@ -25,7 +25,10 @@ gen_musics/
 # ignore generated audio
 gen_musics/
 *.wav
+<<<<<<< HEAD
 *.env
+=======
+>>>>>>> main
 
 
 # Ignore local nltk cache

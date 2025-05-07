@@ -12,6 +12,8 @@
 # ──────────────────────────────────────────────────────────────
 import re
 
+import re
+
 def get_emotion_analysis_prompt(segment: str) -> str:
     return f"""
 You are assisting an audio-engine pipeline that adds background music to a story.
@@ -44,3 +46,24 @@ Return exactly ONE JSON in this schema:
   ]
 }}
 """.strip()
+
+# def get_emotion_analysis_prompt(segment: str) -> str:
+#     return f"""
+# You must return a SINGLE JSON object describing emotional phases in valid JSON (no markdown).
+# Use only standard double quotes. Return nothing else.
+# If you cannot comply, return {{"emotional_phases":[]}}.
+# TEXT SEGMENT:
+# {segment}
+# Return ONE JSON of the form:
+# {{
+#   "emotional_phases":[
+#     {{
+#       "start_text":"",
+#       "emotions_before":"",  
+#       "emotions_after":"",  
+#       "significance":0,       
+#       "explanation":""        
+#     }}
+#   ]
+# }}
+# """.strip()
