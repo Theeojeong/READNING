@@ -175,7 +175,7 @@ async def generate_music_from_upload_v3(
     # ensure_dir(os.path.join(OUTPUT_DIR, book_id))
     # output_filename = FINAL_MIX_NAME  # config.py 의 "final_mix.wav"
     ensure_dir(os.path.join(OUTPUT_DIR, book_id))
-    output_filename = f"{book_id}_{original_stem}_final_mix.wav"
+    output_filename = f"ch{page}.wav"
 
     merge_service.build_and_merge_clips_with_repetition(
         text_chunks=chunks,
