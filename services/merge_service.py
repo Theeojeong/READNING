@@ -15,7 +15,7 @@ def build_and_merge_clips_with_repetition(
 ) -> str:
     print("Muerging clips...")
 
-    lengths = [len(t) for t in text_chunks]
+    lengths = [len(t[0]) for t in text_chunks]
     min_len = min(lengths)
 
     raw_repeats = [max(1, round(l / min_len)) for l in lengths]
