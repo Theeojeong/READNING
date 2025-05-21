@@ -123,6 +123,7 @@ async def generate_music_from_upload_v3(
     # 프런트에서 JSON 배열을 문자열로 보내도록 합의
     #   e.g.  ["잔잔한 피아노","자연 소리"]
     preference: str = Form("[]"),
+    page: int = Form(...)
 ):
     """
     page 파라미터를 없애고 사용자의 음악 취향(preference)을 받는 새 버전.
@@ -208,7 +209,8 @@ async def generate_music_long(
     file: UploadFile = File(...),
     book_id: str = Form(...),
     preference: str = Form("[]"),
-    target_len: int = Form(240)     # 기본 4분, 필요하면 폼에서 바꿀 수 있음
+    target_len: int = Form(240), # 기본 4분, 필요하면 폼에서 바꿀 수 있음
+    page: int = Form(...)     
 ):
     """
     - /music-v3 로직 그대로 수행
