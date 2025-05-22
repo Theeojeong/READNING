@@ -1,10 +1,10 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 
 
-from services.ebooks2text import split_txt_into_pages
+from services.ebooks2text import split_txt_into_pages, convert_and_split
 from services import chunk_text_by_emotion, prompt_service, musicgen_service, merge_service
 
-from utils.file_utils import save_text_to_file, ensure_dir
+from utils.file_utils import save_text_to_file, ensure_dir, secure_filename
 import json, os
 from config import OUTPUT_DIR, FINAL_MIX_NAME, GEN_DURATION, TOTAL_DURATION
 from typing import List
@@ -375,4 +375,102 @@ async def generate_music_for_pages(
         download_urls.append(f"/{OUTPUT_DIR}/{book_id}/{output_filename}")
 
     return {"message": "Music generated for pages", "download_urls": download_urls}
+
+
+@router.post("/music-ebook")
+async def generate_music_for_ebook(
+    file: UploadFile = File(...),
+    book_id: str = Form(...),
+    preference: str = Form("[]"),
+):
+    """Generate music chapter by chapter from a PDF or EPUB file."""
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in [".pdf", ".epub", ".txt"]:
+        raise HTTPException(400, "Only .pdf, .epub or .txt files are supported")
+
+    ensure_dir(os.path.join(OUTPUT_DIR, "uploaded"))
+    upload_path = os.path.join(
+        OUTPUT_DIR,
+        "uploaded",
+        secure_filename(file.filename),
+    )
+    with open(upload_path, "wb") as f:
+        f.write(await file.read())
+
+    if ext in [".pdf", ".epub"]:
+        chapters = convert_and_split(upload_path)
+    else:
+        text = open(upload_path, "r", encoding="utf-8").read()
+        pages = split_txt_into_pages(text)
+        chapters = [
+            {"title": f"Page {i+1}", "content": p} for i, p in enumerate(pages)
+        ]
+
+    if not chapters:
+        raise HTTPException(400, "챕터를 분할하지 못했습니다")
+
+    chapter_dir = f"{book_id}/{Path(file.filename).stem}"
+    ensure_dir(os.path.join(OUTPUT_DIR, chapter_dir))
+
+    try:
+        pref_list: List[str] = json.loads(preference)
+        if not isinstance(pref_list, list):
+            raise ValueError
+    except Exception:
+        pref_list = []
+
+    download_urls: List[str] = []
+
+    for idx, chapter in enumerate(chapters, start=1):
+        chapter_text = chapter["content"]
+
+        uploaded_txt = os.path.join(
+            OUTPUT_DIR, "uploaded", f"{chapter_dir}_ch{idx}.txt"
+        )
+        tmp_path = os.path.join(
+            OUTPUT_DIR, "uploaded", f"{chapter_dir}_tmp.txt"
+        )
+        save_text_to_file(uploaded_txt, chapter_text)
+        save_text_to_file(tmp_path, chapter_text)
+
+        chunks = chunk_text_by_emotion.chunk_text_by_emotion(tmp_path)
+
+        global_prompt = prompt_service.generate_global(chapter_text)
+        music_prompts = []
+        for chunk in chunks:
+            chunk_txt = chunk[0] if isinstance(chunk, (list, tuple)) else chunk
+            regional = prompt_service.generate_regional(chunk_txt)
+            pref_line = (
+                f"User preference: {', '.join(pref_list)}" if pref_list else ""
+            )
+            music_prompts.append(
+                prompt_service.compose_musicgen_prompt(
+                    global_prompt, f"{regional}\n{pref_line}"
+                )
+            )
+
+        musicgen_service.generate_music_samples(
+            global_prompt=global_prompt,
+            regional_prompts=music_prompts,
+            book_id_dir=chapter_dir,
+        )
+
+        output_filename = f"ch{idx}.wav"
+        merge_service.build_and_merge_clips_with_repetition(
+            text_chunks=chunks,
+            base_output_dir=OUTPUT_DIR,
+            book_id_dir=chapter_dir,
+            output_name=output_filename,
+            clip_duration=GEN_DURATION,
+            total_duration=TOTAL_DURATION,
+            fade_ms=1500,
+        )
+
+        download_urls.append(f"/{OUTPUT_DIR}/{chapter_dir}/{output_filename}")
+
+    return {
+        "message": "Music generated for ebook chapters",
+        "download_urls": download_urls,
+    }
 

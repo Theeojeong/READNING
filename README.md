@@ -87,6 +87,11 @@ http://localhost:8000/docs
 - `preference` 필드에 `["피아노", "잔잔함"]` 같은 JSON 배열을 주면 선호도를 프롬프트에 반영합니다.
 - 잘못된 `page` 값이 전달되면 1 페이지가 기본으로 사용됩니다.
 
+### POST /generate/music-ebook
+- `.pdf` 또는 `.epub` 파일 업로드
+- 챕터 단위로 분할 후 각 챕터별 음악을 생성합니다.
+- 응답으로 각 챕터 `ch{n}.wav` 파일의 다운로드 링크 목록을 반환합니다.
+
 ### GET /download
 - 최종 생성된 `final_mix.wav` 다운로드
 
