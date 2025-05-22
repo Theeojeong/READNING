@@ -127,7 +127,7 @@ async def generate_music_from_upload_v3(
     # 프런트에서 JSON 배열을 문자열로 보내도록 합의
     #   e.g.  ["잔잔한 피아노","자연 소리"]
     preference: str = Form("[]"),
-    page: int = Form(...),
+    page: int = Form(1),
 ):
     """페이지를 분할한 뒤 해당 페이지를 감정 단위로 나눠 음악을 생성한다."""
 
@@ -140,8 +140,16 @@ async def generate_music_from_upload_v3(
     pages = split_txt_into_pages(text)
     if not pages:
         raise HTTPException(400, "페이지 분할에 실패했습니다")
+
+    warning = None
     if page < 1 or page > len(pages):
-        raise HTTPException(400, f"page 값은 1~{len(pages)} 사이여야 합니다")
+        warning = (
+            f"page 값은 1~{len(pages)} 사이여야 합니다. "
+            "기본값 1로 처리합니다."
+        )
+        print(f"[!] {warning}")
+        page = 1
+
     page_text = pages[page - 1]
 
     # ★ 챕터 전용 하위 폴더 경로
@@ -162,7 +170,8 @@ async def generate_music_from_upload_v3(
         if not isinstance(pref_list, list):
             raise ValueError
     except Exception:
-        raise HTTPException(400, "preference 는 JSON 배열 형식이어야 합니다")
+        print("[!] preference 파싱 실패: 기본값 [] 사용")
+        pref_list = []
 
     # ── 3) 감정-청크 분할 ─────────────────────────────────────────
     chunks = chunk_text_by_emotion.chunk_text_by_emotion(tmp_path)
@@ -206,10 +215,13 @@ async def generate_music_from_upload_v3(
         fade_ms=1500,
     )
 
-    return {
+    response = {
         "message": "Music generated (v3)",
         "download_url": f"/{OUTPUT_DIR}/{chapter_dir}/{output_filename}",
     }
+    if warning:
+        response["warning"] = warning
+    return response
 
 
 @router.post("/music-v3-long")                                  # ★ 새 엔드포인트
