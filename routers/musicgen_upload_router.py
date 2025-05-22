@@ -2,10 +2,17 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 
 
 from services.ebooks2text import split_txt_into_pages, convert_and_split
-from services import chunk_text_by_emotion, prompt_service, musicgen_service, merge_service
+from services import (
+    chunk_text_by_emotion,
+    prompt_service,
+    musicgen_service,
+    merge_service,
+    firestore_service,
+)
 
 from utils.file_utils import save_text_to_file, ensure_dir, secure_filename
-import json, os
+import json
+import os
 from config import OUTPUT_DIR, FINAL_MIX_NAME, GEN_DURATION, TOTAL_DURATION
 from typing import List
 from pathlib import Path 
@@ -473,4 +480,79 @@ async def generate_music_for_ebook(
         "message": "Music generated for ebook chapters",
         "download_urls": download_urls,
     }
+
+
+@router.post("/book")
+async def upload_book(
+    file: UploadFile = File(...),
+    book_id: str = Form(...),
+    book_title: str = Form(...),
+):
+    """Upload a book (PDF/EPUB) and generate music for each chapter."""
+
+    ensure_dir(os.path.join(OUTPUT_DIR, "uploaded"))
+    upload_path = os.path.join(OUTPUT_DIR, "uploaded", secure_filename(file.filename))
+    with open(upload_path, "wb") as f:
+        f.write(await file.read())
+
+    chapters = convert_and_split(upload_path)
+    if not chapters:
+        raise HTTPException(400, "챕터를 분할하지 못했습니다")
+
+    chapter_results: List[dict] = []
+
+    for idx, chapter in enumerate(chapters, start=1):
+        chapter_title = chapter.get("title") or f"Chapter {idx}"
+        safe_chapter = secure_filename(chapter_title)
+        chapter_dir = f"{book_id}/{safe_chapter}"
+        ensure_dir(os.path.join(OUTPUT_DIR, chapter_dir))
+
+        uploaded_txt = os.path.join(OUTPUT_DIR, "uploaded", f"{safe_chapter}.txt")
+        tmp_path = os.path.join(OUTPUT_DIR, "uploaded", f"{safe_chapter}_tmp.txt")
+        save_text_to_file(uploaded_txt, chapter["content"])
+        save_text_to_file(tmp_path, chapter["content"])
+
+        chunks = chunk_text_by_emotion.chunk_text_by_emotion(tmp_path)
+
+        global_prompt = prompt_service.generate_global(chapter["content"])
+        music_prompts = []
+        for chunk in chunks:
+            chunk_txt = chunk[0] if isinstance(chunk, (list, tuple)) else chunk
+            regional = prompt_service.generate_regional(chunk_txt)
+            music_prompts.append(
+                prompt_service.compose_musicgen_prompt(global_prompt, regional)
+            )
+
+        musicgen_service.generate_music_samples(
+            global_prompt=global_prompt,
+            regional_prompts=music_prompts,
+            book_id_dir=chapter_dir,
+        )
+
+        merge_service.build_and_merge_clips_with_repetition(
+            text_chunks=chunks,
+            base_output_dir=OUTPUT_DIR,
+            book_id_dir=chapter_dir,
+            output_name=FINAL_MIX_NAME,
+            clip_duration=GEN_DURATION,
+            total_duration=TOTAL_DURATION,
+            fade_ms=1500,
+        )
+
+        music_url = f"/{OUTPUT_DIR}/{chapter_dir}/{FINAL_MIX_NAME}"
+        chapter_results.append(
+            {
+                "title": chapter_title,
+                "page": idx,
+                "content": chapter["content"],
+                "musicUrl": music_url,
+            }
+        )
+
+    firestore_service.add_book_info(
+        book_id,
+        {"title": book_title, "chapters": chapter_results},
+    )
+
+    return {"book_id": book_id, "title": book_title, "chapters": chapter_results}
 
