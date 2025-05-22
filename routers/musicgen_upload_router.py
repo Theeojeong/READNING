@@ -155,8 +155,6 @@ async def generate_music_from_upload_v3(
         raise HTTPException(400, "preference 는 JSON 배열 형식이어야 합니다")
 
     # ── 3) 감정-청크 분할 ─────────────────────────────────────────
-    tmp_path = os.path.join(OUTPUT_DIR, "uploaded", f"{book_id}_tmp.txt")
-    save_text_to_file(tmp_path, text)
     chunks = chunk_text_by_emotion.chunk_text_by_emotion(tmp_path)
     print(f"청크 개수: {len(chunks)}")
 
