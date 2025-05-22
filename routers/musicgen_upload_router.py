@@ -556,3 +556,12 @@ async def upload_book(
 
     return {"book_id": book_id, "title": book_title, "chapters": chapter_results}
 
+
+@router.get("/books/{book_id}")
+def get_book_info(book_id: str):
+    """Retrieve saved book information from Firestore."""
+    data = firestore_service.get_book_info(book_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Book not found")
+    return data
+
