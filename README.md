@@ -77,6 +77,11 @@ http://localhost:8000/docs
 - 음악 생성 → 병합
 - 응답으로 다운로드 링크 반환
 
+### POST /generate/music-pages
+- 여러 페이지가 포함된 `.txt` 파일 업로드
+- 서버에서 자동으로 페이지 단위로 분할 후 각 페이지별 음악을 생성합니다.
+- 응답으로 각 페이지 `ch{n}.wav` 파일의 다운로드 링크 목록을 반환합니다.
+
 ### GET /download
 - 최종 생성된 `final_mix.wav` 다운로드
 
