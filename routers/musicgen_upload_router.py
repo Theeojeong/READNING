@@ -1,5 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from services import analyze_emotions_with_gpt, chunk_text_by_emotion, prompt_service, musicgen_service, emotion_service, merge_service, split_text
+from services import analyze_emotions_with_gpt, chunk_text_by_emotion, prompt_service, musicgen_service, merge_service, split_text
 from utils.file_utils import save_text_to_file, ensure_dir
 import json, os
 from config import OUTPUT_DIR, FINAL_MIX_NAME, GEN_DURATION, TOTAL_DURATION
@@ -23,7 +23,7 @@ def generate_music_from_upload(
     save_text_to_file(os.path.join(OUTPUT_DIR,"uploaded",f"{book_id}_ch{page}.txt"), text)
 
     global_prompt = prompt_service.generate_global(text)
-    chunks = emotion_service.hybrid_chunk_text_by_emotion_fulltext(text)
+    chunks = chunk_text_by_emotion.chunk_text_by_emotion(text)
 
     regional_prompts = []
     for i, chunk_text in enumerate(chunks):
