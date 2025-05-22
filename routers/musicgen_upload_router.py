@@ -127,28 +127,34 @@ async def generate_music_from_upload_v3(
     # 프런트에서 JSON 배열을 문자열로 보내도록 합의
     #   e.g.  ["잔잔한 피아노","자연 소리"]
     preference: str = Form("[]"),
-    page: int = Form(...)
+    page: int = Form(...),
 ):
-    """
-    page 파라미터를 없애고 사용자의 음악 취향(preference)을 받는 새 버전.
-    preference는 JSON 배열 문자열로 전달받아 List[str]으로 변환해 사용한다.
-    """
-    # ── 1) 텍스트 읽기 ─────────────────────────────────────────────
+    """페이지를 분할한 뒤 해당 페이지를 감정 단위로 나눠 음악을 생성한다."""
+
+    # ── 1) 텍스트 읽기 및 페이지 분할 ────────────────────────────
     text = file.file.read().decode("utf-8")
-    original_stem = Path(file.filename).stem    
+    original_stem = Path(file.filename).stem
     if not text:
         raise HTTPException(400, "업로드된 파일이 비어 있습니다.")
 
+    pages = split_txt_into_pages(text)
+    if not pages:
+        raise HTTPException(400, "페이지 분할에 실패했습니다")
+    if page < 1 or page > len(pages):
+        raise HTTPException(400, f"page 값은 1~{len(pages)} 사이여야 합니다")
+    page_text = pages[page - 1]
+
     # ★ 챕터 전용 하위 폴더 경로
-    chapter_dir = f"{book_id}/{original_stem}"        # ex) "string/ch01"
+    chapter_dir = f"{book_id}/{original_stem}"
     ensure_dir(os.path.join(OUTPUT_DIR, chapter_dir))
 
-    uploaded_path = os.path.join(OUTPUT_DIR, "uploaded", f"{chapter_dir}.txt")
-    save_text_to_file(uploaded_path, text)
+    uploaded_path = os.path.join(
+        OUTPUT_DIR, "uploaded", f"{chapter_dir}_p{page}.txt")
+    save_text_to_file(uploaded_path, page_text)
 
     tmp_path = os.path.join(
         OUTPUT_DIR, "uploaded", f"{chapter_dir}_tmp.txt")
-    save_text_to_file(tmp_path, text)
+    save_text_to_file(tmp_path, page_text)
 
     # ── 2) preference 파싱 ───────────────────────────────────────
     try:
@@ -163,7 +169,7 @@ async def generate_music_from_upload_v3(
     print(f"청크 개수: {len(chunks)}")
 
     # ── 4) 프롬프트 생성 (취향 반영) ───────────────────────────────
-    global_prompt = prompt_service.generate_global(text)
+    global_prompt = prompt_service.generate_global(page_text)
     music_prompts = []
     for chunk in chunks:  # chunk 가 튜플이면 (chunk_text, ctx)
         chunk_text = chunk[0] if isinstance(chunk, (list, tuple)) else chunk
