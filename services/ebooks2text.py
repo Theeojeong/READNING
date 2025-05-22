@@ -3,6 +3,9 @@ from ebooklib import epub, ITEM_DOCUMENT
 from bs4 import BeautifulSoup
 import os
 import re
+from typing import List
+
+from services.split_text import split_text_into_processing_segments
 
 def extract_text_blocks(pdf_path):
     doc = fitz.open(pdf_path)
@@ -69,6 +72,26 @@ def chunk_by_sentences(text, n=300):
         chunk = " ".join(chunk_sentences)
         chunks.append({"title": f"Chunk {i//n + 1}", "content": chunk})
     return chunks
+
+
+def split_txt_into_pages(text_or_path: str) -> List[str]:
+    """Split raw text into page-sized chunks similar to the frontend.
+
+    This uses the same logic as ``split_text_into_processing_segments`` to
+    ensure pages do not cut sentences abruptly. ``text_or_path`` may be either
+    a string of text or a path to a ``.txt`` file.
+    """
+
+    if os.path.exists(text_or_path):
+        with open(text_or_path, "r", encoding="utf-8") as f:
+            text = f.read()
+    else:
+        text = text_or_path
+
+    pages: List[str] = []
+    for seg, _ in split_text_into_processing_segments(text):
+        pages.append(seg)
+    return pages
 
 def split_pdf_into_chapters(pdf_path):
     text = extract_text_blocks(pdf_path)

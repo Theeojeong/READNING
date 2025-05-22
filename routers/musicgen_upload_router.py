@@ -1,5 +1,9 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+
+
+from services.ebooks2text import split_txt_into_pages
 from services import chunk_text_by_emotion, prompt_service, musicgen_service, merge_service
+
 from utils.file_utils import save_text_to_file, ensure_dir
 import json, os
 from config import OUTPUT_DIR, FINAL_MIX_NAME, GEN_DURATION, TOTAL_DURATION
@@ -289,4 +293,68 @@ async def generate_music_long(
         "message": f"Music generated (v3-long, {target_len}s)",
         "download_url": f"/{OUTPUT_DIR}/{chapter_dir}/{output_filename}",
     }
+
+
+@router.post("/music-pages")
+async def generate_music_for_pages(
+    file: UploadFile = File(...),
+    book_id: str = Form(...),
+):
+    """Generate music for each page of a text file."""
+
+    # 1) read the uploaded text
+    text = file.file.read().decode("utf-8")
+    if not text:
+        raise HTTPException(400, "업로드된 파일이 비어 있습니다.")
+
+    # 2) split into page texts
+    pages = split_txt_into_pages(text)
+    if not pages:
+        raise HTTPException(400, "페이지를 분할하지 못했습니다")
+
+    download_urls: List[str] = []
+
+    for idx, page_text in enumerate(pages, start=1):
+        # 저장용 파일 경로 (원본 및 임시)
+        uploaded_path = os.path.join(OUTPUT_DIR, "uploaded", f"{book_id}_ch{idx}.txt")
+        tmp_path = os.path.join(OUTPUT_DIR, "uploaded", f"{book_id}_tmp.txt")
+        save_text_to_file(uploaded_path, page_text)
+        save_text_to_file(tmp_path, page_text)
+
+        # 감정 기반 청크 분할
+        chunks = chunk_text_by_emotion.chunk_text_by_emotion(tmp_path)
+
+        # 프롬프트 준비
+        global_prompt = prompt_service.generate_global(page_text)
+        music_prompts = []
+        for chunk in chunks:
+            chunk_txt = chunk[0] if isinstance(chunk, (list, tuple)) else chunk
+            regional = prompt_service.generate_regional(chunk_txt)
+            music_prompts.append(
+                prompt_service.compose_musicgen_prompt(global_prompt, regional)
+            )
+
+        # MusicGen 생성
+        musicgen_service.generate_music_samples(
+            global_prompt=global_prompt,
+            regional_prompts=music_prompts,
+            book_id_dir=book_id,
+        )
+
+        # 결과 병합
+        output_filename = f"ch{idx}.wav"
+        ensure_dir(os.path.join(OUTPUT_DIR, book_id))
+        merge_service.build_and_merge_clips_with_repetition(
+            text_chunks=chunks,
+            base_output_dir=OUTPUT_DIR,
+            book_id_dir=book_id,
+            output_name=output_filename,
+            clip_duration=GEN_DURATION,
+            total_duration=TOTAL_DURATION,
+            fade_ms=1500,
+        )
+
+        download_urls.append(f"/{OUTPUT_DIR}/{book_id}/{output_filename}")
+
+    return {"message": "Music generated for pages", "download_urls": download_urls}
 
