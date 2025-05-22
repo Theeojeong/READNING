@@ -1,5 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from services import analyze_emotions_with_gpt, chunk_text_by_emotion, prompt_service, musicgen_service, merge_service, split_text
+from services import chunk_text_by_emotion, prompt_service, musicgen_service, merge_service
 from utils.file_utils import save_text_to_file, ensure_dir
 import json, os
 from config import OUTPUT_DIR, FINAL_MIX_NAME, GEN_DURATION, TOTAL_DURATION
