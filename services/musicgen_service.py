@@ -29,6 +29,7 @@ def generate_music_samples(
 
     # iterative refine
     melody = base_wav
+    saved_paths = []
     for i, prompt in enumerate(regional_prompts):
         print(f"[2] Generating regional variation {i+1}/{len(regional_prompts)}")
         wav = model.generate_with_chroma([prompt], melody, sr)[0]
@@ -37,5 +38,8 @@ def generate_music_samples(
 
         # Save & Listen
         filename = f"regional_output_{i+1}"
-        path = os.path.join(base_output_dir,book_id_dir, filename)
+        path = os.path.join(base_output_dir, book_id_dir, filename)
         audio_write(path, wav.cpu(), sr, strategy="loudness", loudness_compressor=True)
+        saved_paths.append(f"{path}.wav")
+
+    return saved_paths
