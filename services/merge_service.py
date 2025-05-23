@@ -14,7 +14,7 @@ def build_and_merge_clips_with_repetition(
         fade_ms : int = 1500,
         cleanup_regionals: bool = False # 인자 추가
 ) -> str:
-    print("Muerging clips...")
+    print("Merging clips...")
 
     lengths = [len(t[0]) for t in text_chunks]
     min_len = min(lengths)
