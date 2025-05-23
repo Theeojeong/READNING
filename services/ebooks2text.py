@@ -14,17 +14,40 @@ def extract_text_blocks(pdf_path):
     return "\n".join(pages)
 
 def detect_chapter_by_heading(text):
-    # Pattern 1: Chapter markers
-    pattern = re.compile(r"(CHAPTER\s+\w+|Chapter\s+\d+|제\s*\d+\s*장|\d+\s*장)", re.MULTILINE)
+    """Detect chapters in ``text`` by common heading patterns.
+
+    Consecutive duplicate headings are ignored. If the same heading appears
+    again later in the document, a numeric suffix is appended so that each
+    chapter title remains unique.
+    """
+
+    pattern = re.compile(
+        r"(CHAPTER\s+\w+|Chapter\s+\d+|제\s*\d+\s*장|\d+\s*장)", re.MULTILINE
+    )
     splits = pattern.split(text)
 
     if len(splits) < 3:
         return None  # Not reliable
+
     chapters = []
+    title_counts: dict[str, int] = {}
+    prev_title = None
+
     for i in range(1, len(splits), 2):
-        title = splits[i].strip()
+        raw_title = splits[i].strip()
+
+        # Ignore repeated consecutive headings
+        if raw_title == prev_title:
+            continue
+        prev_title = raw_title
+
+        count = title_counts.get(raw_title, 0) + 1
+        title_counts[raw_title] = count
+        title = raw_title if count == 1 else f"{raw_title} ({count})"
+
         body = splits[i + 1].strip() if i + 1 < len(splits) else ""
         chapters.append({"title": title, "content": body})
+
     return chapters
 
 def split_by_toc(text):
@@ -93,16 +116,30 @@ def split_txt_into_pages(text_or_path: str) -> List[str]:
         pages.append(seg)
     return pages
 
+def _deduplicate_chapter_titles(chapters: List[dict]) -> List[dict]:
+    """Ensure chapter titles are unique by appending numeric suffixes."""
+
+    counts: dict[str, int] = {}
+    for ch in chapters:
+        base = ch.get("title", "")
+        count = counts.get(base, 0)
+        counts[base] = count + 1
+        if count:
+            ch["title"] = f"{base} ({count + 1})"
+    return chapters
+
+
 def split_pdf_into_chapters(pdf_path):
     text = extract_text_blocks(pdf_path)
 
     chapters = detect_chapter_by_heading(text)
     if chapters:
         print("Using chapter markers")
-        return chapters
+    else:
+        print("Using fixed paragraph split")
+        chapters = chunk_by_sentences(text)
 
-    print("Using fixed paragraph split")
-    return chunk_by_sentences(text)
+    return _deduplicate_chapter_titles(chapters)
 
 
 def split_epub_into_chapters(epub_path):
