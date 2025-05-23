@@ -29,14 +29,23 @@ def delete_files_in_directory(path: str, extension: str = ".wav", exclude_files:
             os.remove(os.path.join(path, filename))
 
 def secure_filename(name: str) -> str:
+    """Safely normalizes a string for use as a filename.
+
+    Unicode characters are decomposed using ``NFKD`` and any combining
+    marks are removed so that accented Latin characters are transliterated
+    to their ASCII base forms.  Remaining characters are retained and any
+    that are not letters, numbers, ``.``, ``-`` or ``_`` are replaced with
+    underscores.  The function falls back to ``"file"`` if the result is
+    empty.
     """
-    공백·한글·특수문자를 언더스코어/영문자로 치환해
-    파일 시스템과 URL 모두 안전한 문자열로 변환.
-    """
-    name = (
-        unicodedata.normalize("NFKD", name)
-        .encode("ascii", "ignore")
-        .decode("ascii")
-    )
-    name = re.sub(r"[^\w.-]+", "_", name)  # 영문·숫자·._ 만 남김
-    return name.strip("._") or "file"
+
+    # Normalize and strip combining accents/marks
+    name = unicodedata.normalize("NFKD", name)
+    name = "".join(c for c in name if not unicodedata.combining(c))
+
+    # Replace characters outside of the safe set with underscores
+    name = re.sub(r"[^\w.-]+", "_", name)
+
+    # Trim leading/trailing periods/underscores and return a default if empty
+    name = name.strip("._")
+    return name or "file"
