@@ -4,7 +4,6 @@ from bs4 import BeautifulSoup
 import os
 import re
 from typing import List
-from nltk.tokenize import sent_tokenize
 
 from services.split_text import split_text_into_processing_segments
 
