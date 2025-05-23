@@ -237,7 +237,6 @@ async def generate_music_long(
     book_id: str = Form(...),
     preference: str = Form("[]"),
     target_len: int = Form(240), # 기본 4분, 필요하면 폼에서 바꿀 수 있음
-    page: int = Form(...)     
 ):
     """
     - /music-v3 로직 그대로 수행
@@ -249,6 +248,8 @@ async def generate_music_long(
     original_stem = Path(file.filename).stem
     if not text:
         raise HTTPException(400, "업로드된 파일이 비어 있습니다.")
+    if target_len <= 0:
+        raise HTTPException(400, "target_len 은 0보다 커야 합니다")
 
     # ── 2) 챕터 전용 폴더 준비 ───────────────────────────────────
     chapter_dir = f"{book_id}/{original_stem}"       # ex) string/ch01
@@ -271,48 +272,70 @@ async def generate_music_long(
         raise HTTPException(400, "preference 는 JSON 배열 형식이어야 합니다")
 
     # ── 4) 감정-청크 분할 ────────────────────────────────────────
-    chunks = chunk_text_by_emotion.chunk_text_by_emotion(tmp_path)
+    try:
+        chunks = chunk_text_by_emotion.chunk_text_by_emotion(tmp_path)
+    except Exception as e:
+        print(f"[music-v3-long] chunking error: {e}")
+        raise HTTPException(500, "텍스트 청크 분할 중 오류가 발생했습니다")
     print(f"청크 개수: {len(chunks)}")
 
     # ── 5) 프롬프트 & MusicGen ─────────────────────────────────
-    global_prompt = prompt_service.generate_global(text)
-    music_prompts = []
-    for chunk in chunks:
-        chunk_txt = chunk[0] if isinstance(chunk, (list, tuple)) else chunk
-        regional = prompt_service.generate_regional(chunk_txt)
-        pref_line = f"User preference: {', '.join(pref_list)}" if pref_list else ""
-        music_prompts.append(
-            prompt_service.compose_musicgen_prompt(
-                global_prompt, f"{regional}\n{pref_line}"
+    try:
+        global_prompt = prompt_service.generate_global(text)
+        music_prompts = []
+        for chunk in chunks:
+            chunk_txt = chunk[0] if isinstance(chunk, (list, tuple)) else chunk
+            regional = prompt_service.generate_regional(chunk_txt)
+            pref_line = (
+                f"User preference: {', '.join(pref_list)}" if pref_list else ""
             )
-        )
+            music_prompts.append(
+                prompt_service.compose_musicgen_prompt(
+                    global_prompt, f"{regional}\n{pref_line}"
+                )
+            )
+    except Exception as e:
+        print(f"[music-v3-long] prompt error: {e}")
+        raise HTTPException(500, "프롬프트 생성 중 오류가 발생했습니다")
 
-    musicgen_service.generate_music_samples(
-        global_prompt=global_prompt,
-        regional_prompts=music_prompts,
-        book_id_dir=chapter_dir,
-    )
+    try:
+        musicgen_service.generate_music_samples(
+            global_prompt=global_prompt,
+            regional_prompts=music_prompts,
+            book_id_dir=chapter_dir,
+        )
+    except Exception as e:
+        print(f"[music-v3-long] musicgen error: {e}")
+        raise HTTPException(500, "음악 생성 중 오류가 발생했습니다")
 
     # ── 6) 1차 병합 (30 s × N) ─────────────────────────────────
     output_filename = f"{original_stem}_final_mix.wav"
-    merge_service.build_and_merge_clips_with_repetition(
-        text_chunks=chunks,
-        base_output_dir=OUTPUT_DIR,
-        book_id_dir=chapter_dir,
-        output_name=output_filename,
-        clip_duration=GEN_DURATION,
-        total_duration=target_len,     # 1차 제한은 대략 길이 계산용
-        fade_ms=1500,
-    )
+    try:
+        merge_service.build_and_merge_clips_with_repetition(
+            text_chunks=chunks,
+            base_output_dir=OUTPUT_DIR,
+            book_id_dir=chapter_dir,
+            output_name=output_filename,
+            clip_duration=GEN_DURATION,
+            total_duration=target_len,     # 1차 제한은 대략 길이 계산용
+            fade_ms=1500,
+        )
+    except Exception as e:
+        print(f"[music-v3-long] merge error: {e}")
+        raise HTTPException(500, "오디오 병합 중 오류가 발생했습니다")
 
     # ── 7) 4 분까지 반복-패딩 ───────────────────────────────────
-    repeat_clips_to_length(
-        folder=os.path.join(OUTPUT_DIR, chapter_dir),
-        base_name="regional_output_",      # regional_output_1.wav …
-        clip_duration=GEN_DURATION,
-        target_sec=target_len,
-        output_name=output_filename,       # 같은 이름 덮어쓰기
-    )
+    try:
+        repeat_clips_to_length(
+            folder=os.path.join(OUTPUT_DIR, chapter_dir),
+            base_name="regional_output_",      # regional_output_1.wav …
+            clip_duration=GEN_DURATION,
+            target_sec=target_len,
+            output_name=output_filename,       # 같은 이름 덮어쓰기
+        )
+    except Exception as e:
+        print(f"[music-v3-long] repeat error: {e}")
+        raise HTTPException(500, "오디오 반복 처리 중 오류가 발생했습니다")
 
     return {
         "message": f"Music generated (v3-long, {target_len}s)",
