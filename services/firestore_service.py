@@ -33,14 +33,18 @@ _bucket = storage.bucket()        # 기본 버킷이 설정됐으므로 이름 �
 # ──────────────────────────────────────────────────────────────
 # 3) Firestore & Storage 유틸 함수
 # ──────────────────────────────────────────────────────────────
-def add_book_info(book_id: str, data: dict) -> None:
-    """Add or update book information in Firestore."""
-    _db.collection("books").document(book_id).set(data, merge=True)
+def add_book_info(uid: str, book_id: str, data: dict) -> None:
+    """users/{uid}/books/{book_id} 문서에 책 정보 추가·병합"""
+    _db.collection("users").document(uid) \
+       .collection("books").document(book_id) \
+       .set(data, merge=True)
 
 
-def get_book_info(book_id: str) -> dict | None:
-    """Retrieve book information from Firestore."""
-    doc = _db.collection("books").document(book_id).get()
+def get_book_info(uid: str, book_id: str) -> dict | None:
+    """users/{uid}/books/{book_id} 문서 가져오기"""
+    doc = (_db.collection("users").document(uid)
+                 .collection("books").document(book_id)
+                 .get())
     return doc.to_dict() if doc.exists else None
 
 

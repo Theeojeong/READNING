@@ -485,6 +485,7 @@ async def generate_music_for_ebook(
 @router.post("/book")
 async def upload_book(
     file: UploadFile = File(...),
+    uid: str = Form(...), 
     book_id: str = Form(...),
     book_title: str = Form(...),
 ):
@@ -556,12 +557,18 @@ async def upload_book(
             }
         )
 
-    firestore_service.add_book_info(
-        book_id,
-        {"title": book_title, "chapters": chapter_results},
+    firestore_service.add_book_info(       # ⭐️ ② uid 전달
+        uid=uid,
+        book_id=book_id,
+        data={"title": book_title, "chapters": chapter_results},
     )
 
-    return {"book_id": book_id, "title": book_title, "chapters": chapter_results}
+    return {
+        "uid": uid,
+        "book_id": book_id,
+        "title": book_title,
+        "chapters": chapter_results,
+    }
 
 
 @router.get("/books/{book_id}")
