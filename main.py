@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware ##프론트와 연결 위한 
 from routers import musicgen_upload_router
 from config import OUTPUT_DIR, FINAL_MIX_NAME
 from utils.file_utils import secure_filename
+from pathlib import Path
 import os
 
 app = FastAPI(title="Readning API", version="1.0") #FastAPI 서버 호출
@@ -32,20 +33,26 @@ def root():
     return { "message": "Readning API is running" }
 
 
-
 @app.get("/gen_musics/{user_id}/{book_title}/ch{page}.wav")
 def download_music(user_id: str, book_title: str, page: int):
     safe_title = secure_filename(book_title)
-    file_path  = os.path.join(OUTPUT_DIR, user_id, safe_title, f"ch{page}.wav")
+    path = Path(OUTPUT_DIR) / user_id / safe_title / f"ch{page}.wav"
 
-    # 👉  파일이 없으면 404 로 돌려주기
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
+    if not path.exists():
+        raise HTTPException(404, "file not found")
 
-    # 👉  있을 때는 audio/wav 로 확실하게 응답
     return FileResponse(
-        file_path,
-        media_type="audio/wav",
+        path, media_type="audio/wav",
         filename=f"ch{page}.wav",
-        headers={"Content-Disposition": f'inline; filename="ch{page}.wav"'},
+        headers={"Content-Disposition": f'inline; filename="ch{page}.wav"'}
     )
+
+# ───────────────────────────────────────────────────────────────
+# ② 레거시 구조: /gen_musics/<book_title>/ch{page}.wav
+# ───────────────────────────────────────────────────────────────
+@app.get("/gen_musics/{book_title}/ch{page}.wav", include_in_schema=False)
+def legacy_download(book_title: str, page: int):
+    path = Path(OUTPUT_DIR) / book_title / f"ch{page}.wav"
+    if not path.exists():
+        raise HTTPException(404, "file not found (legacy)")
+    return FileResponse(path, media_type="audio/wav")

@@ -233,32 +233,30 @@ async def generate_music_from_upload_v3(
 @router.post("/music-v3-long", summary="Generate long BGM for one page")
 async def generate_music_long(
     file: UploadFile = File(...),
-    user_id: str = Form(...),              # 필수: Firebase UID 등
-    book_title: str = Form(...),           # 필수: 원본 책 제목
-    page: int = Form(..., ge=0),           # 필수: 페이지 번호(0부터)
-    preference: str = Form("[]"),          # 선택: JSON 배열 문자열
-    target_len: int = Form(240),           # 선택: 최종 길이(초)
+    user_id: str     = Form(...),
+    book_title: str  = Form(...),
+    page: int        = Form(..., ge=0),
+    preference: str  = Form("[]"),
+    target_len: int  = Form(240),
 ):
-    # ── 1) 텍스트 읽기 ───────────────────────────────────────
+    # 1) 텍스트 읽기 --------------------------------------------------
     text = file.file.read().decode("utf-8")
     if not text:
         raise HTTPException(400, "업로드된 파일이 비어 있습니다.")
     if target_len <= 0:
         raise HTTPException(400, "target_len 은 0보다 커야 합니다")
 
-    # ── 2) 저장 경로 (user_id / 책제목) ──────────────────────
-    safe_title  = secure_filename(book_title)              # 공백·특수문자 치환
-    book_dir    = os.path.join(user_id, safe_title)        # ex) uid123/마지막_잎새
+    # 2) 저장 경로 ----------------------------------------------------
+    safe_title  = secure_filename(book_title)
+    book_dir    = os.path.join(user_id, safe_title)      # uid/책제목
     abs_bookdir = os.path.join(OUTPUT_DIR, book_dir)
     ensure_dir(abs_bookdir)
 
-    # 텍스트 백업
-    uploaded_path = os.path.join(abs_bookdir, f"ch{page}.txt")
-    tmp_path      = os.path.join(abs_bookdir, f"ch{page}_tmp.txt")
-    save_text_to_file(uploaded_path, text)
+    save_text_to_file(os.path.join(abs_bookdir, f"ch{page}.txt"), text)
+    tmp_path = os.path.join(abs_bookdir, f"ch{page}_tmp.txt")
     save_text_to_file(tmp_path, text)
 
-    # ── 3) preference 파싱 ─────────────────────────────────
+    # 3) preference 파싱 --------------------------------------------
     try:
         pref_list: List[str] = json.loads(preference)
         if not isinstance(pref_list, list):
@@ -266,53 +264,49 @@ async def generate_music_long(
     except Exception:
         raise HTTPException(400, "preference 는 JSON 배열 형식이어야 합니다")
 
-    # ── 4) 감정 기반 청크 분할 ──────────────────────────────
+    # 4) 청크 분할 ----------------------------------------------------
     try:
         chunks = chunk_text_by_emotion.chunk_text_by_emotion(tmp_path)
     except Exception as e:
         print("[music-v3-long] chunking error:", e)
         raise HTTPException(500, "텍스트 청크 분할 중 오류가 발생했습니다")
 
-    # ── 5) 프롬프트 생성 & MusicGen 호출 ───────────────────
+    # 5) MusicGen ----------------------------------------------------
     try:
         global_prompt = prompt_service.generate_global(text)
-        regional_prompts = []
+        rp = []
         for chunk in chunks:
-            chunk_txt = chunk[0] if isinstance(chunk, (list, tuple)) else chunk
-            regional  = prompt_service.generate_regional(chunk_txt)
+            ctxt = chunk[0] if isinstance(chunk, (list, tuple)) else chunk
+            regional = prompt_service.generate_regional(ctxt)
             pref_line = f"User preference: {', '.join(pref_list)}" if pref_list else ""
-            regional_prompts.append(
-                prompt_service.compose_musicgen_prompt(
-                    global_prompt, f"{regional}\n{pref_line}"
-                )
-            )
+            rp.append(prompt_service.compose_musicgen_prompt(
+                global_prompt, f"{regional}\n{pref_line}"
+            ))
         musicgen_service.generate_music_samples(
             global_prompt=global_prompt,
-            regional_prompts=regional_prompts,
-            book_id_dir=book_dir,                 # uid/책제목
+            regional_prompts=rp,
+            book_id_dir=book_dir,
         )
     except Exception as e:
         print("[music-v3-long] musicgen error:", e)
         raise HTTPException(500, "음악 생성 중 오류가 발생했습니다")
 
-    # ── 6) 1차 병합 + 길이 보정 ─────────────────────────────
+    # 6) 병합 및 반복 -------------------------------------------------
     output_filename = f"ch{page}.wav"
     try:
-        # 30초 × N 병합
         merge_service.build_and_merge_clips_with_repetition(
             text_chunks=chunks,
             base_output_dir=OUTPUT_DIR,
             book_id_dir=book_dir,
             output_name=output_filename,
-            clip_duration=GEN_DURATION,          # ms
+            clip_duration=GEN_DURATION,
             total_duration=target_len,
             fade_ms=1500,
         )
-        # 4분(target_len)까지 반복-패딩
         repeat_clips_to_length(
             folder=abs_bookdir,
             base_name="regional_output_",
-            clip_duration=GEN_DURATION // 1000,  # sec
+            clip_duration=GEN_DURATION // 1000,
             target_sec=target_len,
             crossfade_ms=1000,
             output_name=output_filename,
@@ -321,7 +315,7 @@ async def generate_music_long(
         print("[music-v3-long] merge/repeat error:", e)
         raise HTTPException(500, "오디오 병합 또는 반복 처리 중 오류가 발생했습니다")
 
-    # ── 7) 응답 ────────────────────────────────────────────
+    # 7) 응답 --------------------------------------------------------
     return {
         "message": f"{safe_title} p{page} 음원 생성 완료",
         "download_url": f"/{OUTPUT_DIR}/{user_id}/{safe_title}/{output_filename}",
