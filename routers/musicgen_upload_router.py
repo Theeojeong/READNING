@@ -499,16 +499,23 @@ async def upload_book(
     if not chapters:
         raise HTTPException(400, "챕터를 분할하지 못했습니다")
 
+    safe_title = secure_filename(book_title)
+    base_book_dir = f"{book_id}/{safe_title}"
+
     chapter_results: List[dict] = []
 
     for idx, chapter in enumerate(chapters, start=1):
         chapter_title = chapter.get("title") or f"Chapter {idx}"
         safe_chapter = secure_filename(chapter_title)
-        chapter_dir = f"{book_id}/{safe_chapter}"
+        chapter_dir = f"{base_book_dir}/{safe_chapter}"
         ensure_dir(os.path.join(OUTPUT_DIR, chapter_dir))
 
-        uploaded_txt = os.path.join(OUTPUT_DIR, "uploaded", f"{safe_chapter}.txt")
-        tmp_path = os.path.join(OUTPUT_DIR, "uploaded", f"{safe_chapter}_tmp.txt")
+        uploaded_txt = os.path.join(
+            OUTPUT_DIR, "uploaded", f"{safe_title}_{safe_chapter}.txt"
+        )
+        tmp_path = os.path.join(
+            OUTPUT_DIR, "uploaded", f"{safe_title}_{safe_chapter}_tmp.txt"
+        )
         save_text_to_file(uploaded_txt, chapter["content"])
         save_text_to_file(tmp_path, chapter["content"])
 
