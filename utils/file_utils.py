@@ -1,6 +1,7 @@
 # utils/file_utils.py
 import os
-import re, unicodedata
+import re
+import unicodedata
 from pathlib import Path
 
 def save_text_to_file(path: str, text: str) -> None:
@@ -29,19 +30,20 @@ def delete_files_in_directory(path: str, extension: str = ".wav", exclude_files:
             os.remove(os.path.join(path, filename))
 
 def secure_filename(name: str) -> str:
-    """Safely normalizes a string for use as a filename.
+    """Return a sanitized version of ``name`` safe for use as a filename.
 
-    Unicode characters are decomposed using ``NFKD`` and any combining
-    marks are removed so that accented Latin characters are transliterated
-    to their ASCII base forms.  Remaining characters are retained and any
-    that are not letters, numbers, ``.``, ``-`` or ``_`` are replaced with
-    underscores.  The function falls back to ``"file"`` if the result is
-    empty.
+    Unicode characters are preserved whenever possible.  Accented Latin
+    characters are transliterated to their ASCII equivalents while other
+    scripts remain unchanged.  Characters other than letters, numbers,
+    ``.``, ``-`` or ``_`` are replaced with underscores.  If the resulting
+    string is empty, ``"file"`` is returned.
     """
 
-    # Normalize and strip combining accents/marks
-    name = unicodedata.normalize("NFKD", name)
-    name = "".join(c for c in name if not unicodedata.combining(c))
+    # Normalize and strip combining accents to get ASCII approximations.
+    # This provides slugify-like behavior without an external dependency.
+    normalized = unicodedata.normalize("NFKD", name)
+    normalized = "".join(c for c in normalized if not unicodedata.combining(c))
+    name = unicodedata.normalize("NFC", normalized)
 
     # Replace characters outside of the safe set with underscores
     name = re.sub(r"[^\w.-]+", "_", name)
