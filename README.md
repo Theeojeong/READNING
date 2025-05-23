@@ -76,6 +76,8 @@ http://localhost:8000/docs
 - .txt 파일 업로드
 - 음악 생성 → 병합
 - 응답으로 다운로드 링크 반환
+- 업로드된 파일명은 `secure_filename` 유틸리티로 정규화되어 한글 등 유니코드
+  문자는 유지하고, 라틴 문자의 악센트는 영문자로 변환합니다.
 
 ### POST /generate/music-pages
 - 여러 페이지가 포함된 `.txt` 파일 업로드
