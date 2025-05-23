@@ -32,10 +32,16 @@ def root():
 
 
 
-@app.get("/gen_musics/{book_id}/ch{page}.wav")
-def download_final_mix(book_id: str, page: int):
-    filename = f"ch{page}.wav"
-    path = os.path.join(OUTPUT_DIR, book_id, filename)
+@app.get("/gen_musics/{user_id}/{book_title}/ch{page}.wav")
+def download_music(
+    user_id: str,
+    book_title: str,
+    page: int,
+):
+    # 책제목을 업로드 시 변환한 규칙(secure_filename) 그대로 적용
+    safe_title = secure_filename(book_title)
+    filename   = f"ch{page}.wav"
+    path       = os.path.join(OUTPUT_DIR, user_id, safe_title, filename)
 
     if os.path.exists(path):
         return FileResponse(path, filename=filename, media_type="audio/wav")
