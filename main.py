@@ -1,8 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware ##프론트와 연결 위한 CORS설정 
 from routers import musicgen_upload_router
 from config import OUTPUT_DIR, FINAL_MIX_NAME
+from utils.file_utils import secure_filename
 import os
 
 app = FastAPI(title="Readning API", version="1.0") #FastAPI 서버 호출
@@ -33,16 +34,18 @@ def root():
 
 
 @app.get("/gen_musics/{user_id}/{book_title}/ch{page}.wav")
-def download_music(
-    user_id: str,
-    book_title: str,
-    page: int,
-):
-    # 책제목을 업로드 시 변환한 규칙(secure_filename) 그대로 적용
+def download_music(user_id: str, book_title: str, page: int):
     safe_title = secure_filename(book_title)
-    filename   = f"ch{page}.wav"
-    path       = os.path.join(OUTPUT_DIR, user_id, safe_title, filename)
+    file_path  = os.path.join(OUTPUT_DIR, user_id, safe_title, f"ch{page}.wav")
 
-    if os.path.exists(path):
-        return FileResponse(path, filename=filename, media_type="audio/wav")
-    return {"error": f"최종 음원 파일이 존재하지 않습니다: {path}"}
+    # 👉  파일이 없으면 404 로 돌려주기
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # 👉  있을 때는 audio/wav 로 확실하게 응답
+    return FileResponse(
+        file_path,
+        media_type="audio/wav",
+        filename=f"ch{page}.wav",
+        headers={"Content-Disposition": f'inline; filename="ch{page}.wav"'},
+    )

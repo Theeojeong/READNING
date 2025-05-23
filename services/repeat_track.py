@@ -1,41 +1,63 @@
 # services/repeat_track.py
-from pydub import AudioSegment
 import os, math
+from pathlib import Path
+from pydub import AudioSegment
+import logging
+
+logger = logging.getLogger(__name__)
+print("[repeat_track] loaded from", __file__)
 
 def repeat_clips_to_length(
-    folder: str,                 # ex) gen_musics/string/ch01
-    base_name: str,              # ex) regional_output_
-    clip_duration: int = 30,     # sec
-    target_sec: int = 240,       # sec
+    folder: str,
+    base_name: str = "regional_output_",
+    clip_duration: int | None = None,   # sec, None 이면 자동 계산
+    target_sec: int = 240,
     crossfade_ms: int = 1500,
     output_name: str = "final_mix.wav",
 ):
     """
-    folder / base_name{i+1}.wav 파일들을
-    A→A→A→B→B→B 식으로 반복해 target_sec 길이로 만듭니다.
+    • 길이 0 ms 클립 skip
+    • crossfade > clip 길이면 축소
+    • track 길이 0일 때 crossfade = 0
+    • clip_duration 이 0/None 이면 첫 클립 길이(sec)를 사용
     """
-    clips = []
-    idx = 1
-    while True:
-        path = os.path.join(folder, f"{base_name}{idx}.wav")
-        if not os.path.exists(path):
+    # ① 클립 로딩 ------------------------------------------------------
+    clips: list[AudioSegment] = []
+    for idx in range(1, 9999):
+        p = os.path.join(folder, f"{base_name}{idx}.wav")
+        if not os.path.exists(p):
             break
-        clips.append(AudioSegment.from_wav(path))
-        idx += 1
+        c = AudioSegment.from_wav(p)
+        d = len(c)
+        print(f"[repeat_track] {p} → {d} ms")
+        if d == 0:
+            logger.warning(f"[repeat_track] skip empty clip {p}")
+            continue
+        clips.append(c)
 
     if not clips:
-        raise FileNotFoundError("No regional_output_*.wav found")
+        raise FileNotFoundError("No usable regional_output_*.wav found")
 
+    # ② clip_duration 자동 결정 ---------------------------------------
+    if not clip_duration or clip_duration <= 0:
+        clip_duration = len(clips[0]) // 1000 or 1   # 1초 이상 보장
+        logger.warning(f"[repeat_track] clip_duration auto-set to {clip_duration}s")
+
+    # ③ 반복 횟수 계산 --------------------------------------------------
     repeats = math.ceil(target_sec / (len(clips) * clip_duration))
-    print(f"[repeat_track] repeats per clip = {repeats}")
+    logger.info(f"[repeat_track] repeats per clip = {repeats}")
 
-    track = AudioSegment.silent(0)
+    # ④ 클립 반복 & crossfade 보정 -------------------------------------
+    track = AudioSegment.silent(duration=0)
     for clip in clips:
+        dur = len(clip)
+        cf  = crossfade_ms if crossfade_ms < dur else max(0, dur // 4)
         for _ in range(repeats):
-            track = track.append(clip, crossfade=crossfade_ms)
+            track = track.append(clip, crossfade=(0 if len(track) == 0 else cf))
 
-    track = track[: target_sec * 1000]  # 딱 맞춰 자르기
+    # ⑤ 자르기 & 저장 --------------------------------------------------
+    track = track[: target_sec * 1000]
     out_path = os.path.join(folder, output_name)
     track.export(out_path, "wav")
-    print(f"[✓] Repeated mix → {target_sec}s : {out_path}")
+    logger.info(f"[repeat_track] saved {out_path} ({len(track)} ms)")
     return out_path
