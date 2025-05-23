@@ -39,11 +39,22 @@ def secure_filename(name: str) -> str:
     string is empty, ``"file"`` is returned.
     """
 
-    # Normalize and strip combining accents to get ASCII approximations.
-    # This provides slugify-like behavior without an external dependency.
+    # Normalize to NFKD to separate accent marks. Characters that can be
+    # represented in ASCII are transliterated while others (e.g. Korean,
+    # Chinese) are left as-is. This avoids dropping non-Latin characters
+    # completely, unlike the traditional ``ascii``-only approach.
     normalized = unicodedata.normalize("NFKD", name)
-    normalized = "".join(c for c in normalized if not unicodedata.combining(c))
-    name = unicodedata.normalize("NFC", normalized)
+    transliterated = []
+    for ch in normalized:
+        if unicodedata.combining(ch):
+            continue
+        try:
+            ascii_char = ch.encode("ascii").decode("ascii")
+        except UnicodeEncodeError:
+            transliterated.append(ch)
+        else:
+            transliterated.append(ascii_char)
+    name = unicodedata.normalize("NFC", "".join(transliterated))
 
     # Replace characters outside of the safe set with underscores
     name = re.sub(r"[^\w.-]+", "_", name)
