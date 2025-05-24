@@ -4,45 +4,50 @@ from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
 
+"""
+Firestore 의존성을 자동으로 우회하도록 개선한 버전.
+
+▪ DISABLE_FIRESTORE=1   → 강제 더미 모드
+▪ GOOGLE_APPLICATION_CREDENTIALS & FIREBASE_BUCKET 둘 다 없을 때 → 경고만 남기고 더미 모드로 전환
+   (더 이상 RuntimeError 를 발생시키지 않음)
+"""
+
 # ──────────────────────────────────────────────────────────────
-# 1) .env 로드
-#    - DISABLE_FIRESTORE=1 이면 Firebase 의존성을 모두 우회합니다.
-#    - 그렇지 않으면 GOOGLE_APPLICATION_CREDENTIALS와 FIREBASE_BUCKET을 사용합니다.
+# 1) .env 로드 및 환경변수 검사
 # ──────────────────────────────────────────────────────────────
 load_dotenv(Path(__file__).parent / ".env")
 
-DISABLE_FIRESTORE = os.getenv("DISABLE_FIRESTORE", "0") == "1"
+ENV_DISABLE      = os.getenv("DISABLE_FIRESTORE", "0") == "1"
+SA_PATH: Optional[str]     = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+BUCKET_NAME: Optional[str] = os.getenv("FIREBASE_BUCKET")  # ex) readning.appspot.com
 
-if not DISABLE_FIRESTORE:
-    # Firebase 사용 모드
-    SA_PATH: Optional[str] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-    BUCKET_NAME: Optional[str] = os.getenv("FIREBASE_BUCKET")  # ex) readning.appspot.com
+# Firebase 사용 여부 결정
+USE_FIREBASE = (not ENV_DISABLE) and SA_PATH and BUCKET_NAME
 
-    if not SA_PATH or not BUCKET_NAME:
-        raise RuntimeError(
-            "환경변수 설정 누락\n"
-            " - GOOGLE_APPLICATION_CREDENTIALS: 서비스 계정 키 JSON 절대경로\n"
-            " - FIREBASE_BUCKET           : Firebase Storage 기본 버킷명\n"
-        )
-
-    import firebase_admin
-    from firebase_admin import credentials, firestore, storage
-
+if USE_FIREBASE:
     # ──────────────────────────────────────────────────────────
     # 2) Firebase App 초기화 (한 번만)
     # ──────────────────────────────────────────────────────────
+    import firebase_admin
+    from firebase_admin import credentials, firestore, storage
+
     if not firebase_admin._apps:
-        cred = credentials.Certificate(SA_PATH)
+        cred = credentials.Certificate(SA_PATH)  # type: ignore[arg-type]
         firebase_admin.initialize_app(cred, {"storageBucket": BUCKET_NAME})
 
-    _db = firestore.client()
-    _bucket = storage.bucket()  # 기본 버킷이 설정됐으므로 이름 생략 OK
-
+    _db     = firestore.client()
+    _bucket = storage.bucket()  # 기본 버킷 설정 완료
 else:
-    # Firebase 없이 실행하는 더미 모드
+    # ──────────────────────────────────────────────────────────
+    # 3) Firebase 없이 실행하는 더미 구현체
+    # ──────────────────────────────────────────────────────────
+    if not ENV_DISABLE:
+        # 사용자 실수로 자격증명이 빠진 경우라도 서버가 죽지 않도록 경고만 출력
+        print("[firestore_service] WARNING: Firebase 자격증명/버킷이 누락되어 더미 모드로 전환합니다.")
+
     class _DummyDoc:
         exists: bool = False
-        def to_dict(self) -> None:
+        def to_dict(self) -> None:  # type: ignore[override]
             return None
 
     class _DummyCollection:
@@ -52,7 +57,7 @@ else:
             return self
         def set(self, *a: Any, **kw: Any) -> None:
             pass
-        def get(self) -> _DummyDoc:  # type: ignore[name-defined]
+        def get(self) -> "_DummyDoc":
             return _DummyDoc()
 
     class _DummyBucket:
@@ -65,11 +70,11 @@ else:
         def blob(self, *a: Any, **kw: Any) -> "_DummyBucket._DummyBlob":
             return self._DummyBlob()
 
-    _db = _DummyCollection()
+    _db     = _DummyCollection()
     _bucket = _DummyBucket()
 
 # ──────────────────────────────────────────────────────────────
-# 3) Firestore & Storage 유틸 함수 (Firebase 유무에 상관없이 동일 인터페이스 보장)
+# 4) 공통 유틸 함수 (Firebase 유무와 무관)
 # ──────────────────────────────────────────────────────────────
 
 def add_book_info(uid: str, book_id: str, data: Dict[str, Any]) -> None:
@@ -81,16 +86,17 @@ def add_book_info(uid: str, book_id: str, data: Dict[str, Any]) -> None:
 
 def get_book_info(uid: str, book_id: str) -> Optional[Dict[str, Any]]:
     """users/{uid}/books/{book_id} 문서 가져오기"""
-    doc = (_db.collection("users").document(uid)
-                 .collection("books").document(book_id)
-                 .get())
+    doc = (
+        _db.collection("users").document(uid)
+           .collection("books").document(book_id)
+           .get()
+    )
     return doc.to_dict() if getattr(doc, "exists", False) else None
 
 
 def upload_audio(path: str) -> str:
-    """파일을 Firebase Storage(또는 더미)로 업로드하고 public URL 반환"""
+    """파일을 Firebase Storage(또는 더미)에 업로드하고 public URL 반환"""
     blob = _bucket.blob(os.path.basename(path))
-    # 실제 Firebase 모드에서는 업로드 진행, 더미 모드는 no‑op
-    blob.upload_from_filename(path)
-    blob.make_public()
+    blob.upload_from_filename(path)  # 더미 모드면 no-op
+    blob.make_public()               # 더미 모드면 no-op
     return blob.public_url

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi.responses import FileResponse
 
 from services.ebooks2text import split_txt_into_pages, convert_and_split
 from services import (
@@ -16,7 +17,6 @@ from config import OUTPUT_DIR, FINAL_MIX_NAME, GEN_DURATION, TOTAL_DURATION
 from typing import List
 from pathlib import Path 
 from services.repeat_track import repeat_clips_to_length
-
 
 
 router = APIRouter(prefix="/generate", tags = ["UploadWorkflow"])
@@ -230,6 +230,9 @@ async def generate_music_from_upload_v3(
     return response
 
 
+def get_output_path(user_id: str, book_dir: str, chapter: int) -> str:
+    return os.path.join(OUTPUT_DIR, user_id, book_dir, f"ch{chapter}.wav")
+
 @router.post("/music-v3-long", summary="Generate long BGM for one page")
 async def generate_music_long(
     file: UploadFile = File(...),
@@ -239,6 +242,14 @@ async def generate_music_long(
     preference: str  = Form("[]"),
     target_len: int  = Form(240),
 ):
+
+    # ➊ 이미 생성된 파일이 있으면 바로 반환해 무한 재생성 차단
+    safe_title  = secure_filename(book_title)
+    out_wav     = get_output_path(user_id, safe_title, page)
+    if os.path.exists(out_wav):
+        logger.info(f"[SKIP] {out_wav} already exists – returning cached file")
+        return FileResponse(out_wav, media_type="audio/wav")
+
     # 1) 텍스트 읽기 --------------------------------------------------
     text = file.file.read().decode("utf-8")
     if not text:
@@ -247,7 +258,7 @@ async def generate_music_long(
         raise HTTPException(400, "target_len 은 0보다 커야 합니다")
 
     # 2) 저장 경로 ----------------------------------------------------
-    safe_title  = secure_filename(book_title)
+    # safe_title  = secure_filename(book_title)
     book_dir    = os.path.join(user_id, safe_title)      # uid/책제목
     abs_bookdir = os.path.join(OUTPUT_DIR, book_dir)
     ensure_dir(abs_bookdir)

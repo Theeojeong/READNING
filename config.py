@@ -2,8 +2,8 @@
 from pydantic_settings import BaseSettings
 
 OUTPUT_DIR = "gen_musics"
-GEN_DURATION = 30
-TOTAL_DURATION = 260
+GEN_DURATION = 15
+TOTAL_DURATION = 120
 FINAL_MIX_NAME = "final_mix.wav"
 
 # ── 고정 상수 ─────────────────────────────
