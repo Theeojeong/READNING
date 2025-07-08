@@ -15,7 +15,7 @@
 - Python 3.9
 - FastAPI
 - Transformers (감정 분석)
-- Ollama (프롬프트 생성)
+- Ollama (감정 분석 및 프롬프트 생성)
 - Audiocraft / MusicGen
 - Pydub (오디오 병합)
 - Uvicorn (서버 실행)
