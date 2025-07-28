@@ -17,8 +17,21 @@ def save_text_to_file(path: str, text: str) -> None:
 
 
 def load_text_from_file(path: str) -> str:
-    with open(path, 'r', encoding='utf-8') as f:
-        return f.read()
+    """파일에서 텍스트를 안전하게 로드 (인코딩 에러 처리)"""
+    encodings = ['utf-8', 'utf-8-sig', 'cp949', 'euc-kr', 'latin1']
+    
+    for encoding in encodings:
+        try:
+            with open(path, 'r', encoding=encoding) as f:
+                return f.read()
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+        except FileNotFoundError:
+            raise FileNotFoundError(f"파일을 찾을 수 없습니다: {path}")
+        except Exception as e:
+            raise Exception(f"파일 읽기 중 오류 발생: {e}")
+    
+    raise UnicodeDecodeError(f"지원되는 인코딩으로 파일을 읽을 수 없습니다: {path}")
 
 def ensure_dir(path: str):
     if not os.path.exists(path):

@@ -10,9 +10,6 @@
 #  - explanation        : 한두 문장 설명
 # 3. 반환된 JSON에는 감정선 변화 위치 정보가 포함되어 있음
 # ──────────────────────────────────────────────────────────────
-import re
-
-import re
 
 def get_emotion_analysis_prompt(segment: str) -> str:
     return f"""

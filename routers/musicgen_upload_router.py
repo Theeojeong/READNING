@@ -28,7 +28,19 @@ def generate_music_from_upload(
     book_id: str = Form(...),
     page: int = Form(...)
     ):
-    text = file.file.read().decode("utf-8") #사용자로부터 text파일 
+    # 안전한 텍스트 디코딩
+    try:
+        text = file.file.read().decode("utf-8")
+    except UnicodeDecodeError:
+        try:
+            file.file.seek(0)
+            text = file.file.read().decode("cp949")
+        except UnicodeDecodeError:
+            file.file.seek(0)
+            text = file.file.read().decode("latin1")
+    
+    if not text.strip():
+        raise HTTPException(400, "업로드된 파일이 비어 있습니다.") 
 
     save_text_to_file(os.path.join(OUTPUT_DIR,"uploaded",f"{book_id}_ch{page}.txt"), text)
 

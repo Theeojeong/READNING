@@ -1,8 +1,8 @@
-from audiocraft.models import MusicGen
 from audiocraft.data.audio import audio_write
 import os
 from config import OUTPUT_DIR, GEN_DURATION
 from utils.file_utils import ensure_dir
+from services.model_manager import musicgen_manager
 
 def generate_music_samples(
     global_prompt: str,
@@ -19,10 +19,9 @@ def generate_music_samples(
     if not os.path.exists(base_output_dir):
         ensure_dir(OUTPUT_DIR)
     
-    print("Loading MusicGen (facebook/musicgen-melody)...")
-    model = MusicGen.get_pretrained('facebook/musicgen-melody')
-    model.set_generation_params(duration=GEN_DURATION)  # 곡 길이 10초 (예시)
-    sr = model.sample_rate
+    print("Loading MusicGen model...")
+    model = musicgen_manager.get_model()
+    sr = musicgen_manager.sample_rate
     
     print("[1] Generating global melody...")
     base_wav = model.generate([global_prompt])[0]
