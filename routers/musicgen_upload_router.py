@@ -235,10 +235,6 @@ async def generate_music_from_upload_v3(
 
     response = {
         "message": "Music generated (v3)",
-<<<<<<< HEAD
-        "download_url": f"/{OUTPUT_DIR}/{book_id}/{output_filename}",
-    }
-=======
         "download_url": f"/{OUTPUT_DIR}/{chapter_dir}/{output_filename}",
     }
     if warning:
@@ -613,4 +609,3 @@ def get_book_info(book_id: str):
         raise HTTPException(status_code=404, detail="Book not found")
     return data
 
->>>>>>> feature/test_fastapi
