@@ -162,10 +162,3 @@ def convert_and_split(file_path):
         return split_epub_into_chapters(file_path)
     else:
         raise ValueError("Unsupported file format. Only .pdf and .epub are supported.")
-
-# Example usage
-# if __name__ == "__main__":
-#     file_path = "Demian_교양_심리 소설.pdf"
-#     chapters = convert_and_split(file_path)
-#     for i, ch in enumerate(chapters):
-#         print(f"--- {ch['title']} ---\n{ch['content'][:300]}...\n")
