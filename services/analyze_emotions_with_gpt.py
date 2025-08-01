@@ -1,11 +1,10 @@
 import json
 import time
-import ollama
 from typing import Dict, Any
 from utils.logger import log, log_raw_llm_response
-from config import MODEL_NAME
 from services.get_emotion_analysis_prompt import get_emotion_analysis_prompt
-from services.sanitize_llm_output import clean_json
+from services.clean_json import clean_json
+from services.model_manager import ollama_manager
 
 # ──────────────────────────────────────────────────────────────
 # <감정 분석 호출>
@@ -21,7 +20,7 @@ def analyze_emotions_with_gpt(segment: str) -> Dict[str, Any]:
 
     for attempt in range(3):
         try:
-            resp = ollama.chat(model=MODEL_NAME, messages=[{"role": "user", "content": prompt}])
+            resp = ollama_manager.chat([{"role": "user", "content": prompt}])
             raw = resp["message"]["content"].strip()
             log_raw_llm_response(raw)
 

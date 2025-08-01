@@ -3,6 +3,12 @@ from ebooklib import epub, ITEM_DOCUMENT
 from bs4 import BeautifulSoup
 import os
 import re
+<<<<<<< HEAD
+=======
+from typing import List
+
+from services.split_text import split_text_into_processing_segments
+>>>>>>> feature/test_fastapi
 
 def extract_text_blocks(pdf_path):
     doc = fitz.open(pdf_path)
@@ -11,17 +17,53 @@ def extract_text_blocks(pdf_path):
     return "\n".join(pages)
 
 def detect_chapter_by_heading(text):
+<<<<<<< HEAD
     # Pattern 1: Chapter markers
     pattern = re.compile(r"(CHAPTER\s+\w+|Chapter\s+\d+|제\s*\d+\s*장|\d+\s*장)", re.MULTILINE)
+=======
+    """Detect chapters in ``text`` by common heading patterns.
+
+    Consecutive duplicate headings are ignored. If the same heading appears
+    again later in the document, a numeric suffix is appended so that each
+    chapter title remains unique.
+    """
+
+    pattern = re.compile(
+        r"(CHAPTER\s+\w+|Chapter\s+\d+|제\s*\d+\s*장|\d+\s*장)", re.MULTILINE
+    )
+>>>>>>> feature/test_fastapi
     splits = pattern.split(text)
 
     if len(splits) < 3:
         return None  # Not reliable
+<<<<<<< HEAD
     chapters = []
     for i in range(1, len(splits), 2):
         title = splits[i].strip()
         body = splits[i + 1].strip() if i + 1 < len(splits) else ""
         chapters.append({"title": title, "content": body})
+=======
+
+    chapters = []
+    title_counts: dict[str, int] = {}
+    prev_title = None
+
+    for i in range(1, len(splits), 2):
+        raw_title = splits[i].strip()
+
+        # Ignore repeated consecutive headings
+        if raw_title == prev_title:
+            continue
+        prev_title = raw_title
+
+        count = title_counts.get(raw_title, 0) + 1
+        title_counts[raw_title] = count
+        title = raw_title if count == 1 else f"{raw_title} ({count})"
+
+        body = splits[i + 1].strip() if i + 1 < len(splits) else ""
+        chapters.append({"title": title, "content": body})
+
+>>>>>>> feature/test_fastapi
     return chapters
 
 def split_by_toc(text):
@@ -70,16 +112,60 @@ def chunk_by_sentences(text, n=300):
         chunks.append({"title": f"Chunk {i//n + 1}", "content": chunk})
     return chunks
 
+<<<<<<< HEAD
+=======
+
+def split_txt_into_pages(text_or_path: str) -> List[str]:
+    """Split raw text into page-sized chunks similar to the frontend.
+
+    This uses the same logic as ``split_text_into_processing_segments`` to
+    ensure pages do not cut sentences abruptly. ``text_or_path`` may be either
+    a string of text or a path to a ``.txt`` file.
+    """
+
+    if os.path.exists(text_or_path):
+        with open(text_or_path, "r", encoding="utf-8") as f:
+            text = f.read()
+    else:
+        text = text_or_path
+
+    pages: List[str] = []
+    for seg, _ in split_text_into_processing_segments(text):
+        pages.append(seg)
+    return pages
+
+def _deduplicate_chapter_titles(chapters: List[dict]) -> List[dict]:
+    """Ensure chapter titles are unique by appending numeric suffixes."""
+
+    counts: dict[str, int] = {}
+    for ch in chapters:
+        base = ch.get("title", "")
+        count = counts.get(base, 0)
+        counts[base] = count + 1
+        if count:
+            ch["title"] = f"{base} ({count + 1})"
+    return chapters
+
+
+>>>>>>> feature/test_fastapi
 def split_pdf_into_chapters(pdf_path):
     text = extract_text_blocks(pdf_path)
 
     chapters = detect_chapter_by_heading(text)
     if chapters:
         print("Using chapter markers")
+<<<<<<< HEAD
         return chapters
 
     print("Using fixed paragraph split")
     return chunk_by_sentences(text)
+=======
+    else:
+        print("Using fixed paragraph split")
+        chapters = chunk_by_sentences(text)
+
+    return _deduplicate_chapter_titles(chapters)
+>>>>>>> feature/test_fastapi
 
 
 def split_epub_into_chapters(epub_path):
@@ -101,6 +187,7 @@ def convert_and_split(file_path):
     elif ext == ".epub":
         return split_epub_into_chapters(file_path)
     else:
+<<<<<<< HEAD
         raise ValueError("Unsupported file format. Only .pdf and .epub are supported.")
 
 # Example usage
@@ -109,3 +196,6 @@ def convert_and_split(file_path):
 #     chapters = convert_and_split(file_path)
 #     for i, ch in enumerate(chapters):
 #         print(f"--- {ch['title']} ---\n{ch['content'][:300]}...\n")
+=======
+        raise ValueError("Unsupported file format. Only .pdf and .epub are supported.")
+>>>>>>> feature/test_fastapi

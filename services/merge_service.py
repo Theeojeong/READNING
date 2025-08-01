@@ -11,9 +11,10 @@ def build_and_merge_clips_with_repetition(
         output_name : str,
         clip_duration : int ,
         total_duration : int ,
-        fade_ms : int = 1500
+        fade_ms : int = 1500,
+        cleanup_regionals: bool = False # 인자 추가
 ) -> str:
-    print("Muerging clips...")
+    print("Merging clips...")
 
     lengths = [len(t[0]) for t in text_chunks]
     min_len = min(lengths)
@@ -46,7 +47,14 @@ def build_and_merge_clips_with_repetition(
     full_track.export(output_path, format="wav")
 
     clip_dir_path = os.path.join(base_output_dir, book_id_dir)
-    delete_files_in_directory(clip_dir_path, extension=".wav", exclude_files=[output_name])
+    # delete_files_in_directory(clip_dir_path, extension=".wav", exclude_files=[output_name])
+
+    if cleanup_regionals:           # ★ 선택적으로 지움
+        delete_files_in_directory(
+            clip_dir_path,
+            extension=".wav",
+            exclude_files=[output_name]
+        )
 
     # ✅ 완료 로그 추가
     print(f"[✓] Merging finished → {output_path}")

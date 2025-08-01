@@ -2,12 +2,12 @@
 from pydantic_settings import BaseSettings
 
 OUTPUT_DIR = "gen_musics"
-GEN_DURATION = 10
-TOTAL_DURATION = 30
+GEN_DURATION = 15
+TOTAL_DURATION = 120
 FINAL_MIX_NAME = "final_mix.wav"
 
 # ── 고정 상수 ─────────────────────────────
-MAX_SEGMENT_SIZE   = 2600   # LLM 1회 처리 최대 글자수
+MAX_SEGMENT_SIZE   = 6000   # LLM 1회 처리 최대 글자수
 OVERLAP_SIZE       = 600    # 청크 겹침 길이
 CHUNK_PREVIEW_LEN  = 300    # 디버그용 텍스트 미리보기 길이
 
@@ -17,10 +17,14 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     LOG_LLM_RESPONSES: bool = True
     PRINT_CHUNK_TEXT: bool = True
+    # Firebase 연동용 경로 및 버킷 (선택 사항)
+    firebase_sa_path: str | None = None
+    firebase_bucket: str | None = None
 
     class Config:
         env_file = ".env"          # 같은 폴더의 .env 읽어들임
         env_file_encoding = "utf-8"
+        extra = "ignore"            # 정의되지 않은 환경변수 무시
 
 settings = Settings()
 

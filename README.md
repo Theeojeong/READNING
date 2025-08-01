@@ -30,18 +30,17 @@ pip install -r requirements.txt
 
 혹은 직접 설치
 
-1. pip install pydantic_settings audiocraft fastapi ollama nltk torchaudio numpy==1.26.3
-2. sudo apt-get update && sudo apt-get install ffmpeg -y
-
+1. pip install 'torch==2.1.0+cu118' 'torchaudio==2.1.0+cu118' 'torchvision==0.16.0+cu118' --index-url https://download.pytorch.org/whl/cu118
+2. pip install transformers==4.41.2 audiocraft==1.3.0 fastapi uvicorn pydantic_settings nltk ollama numpy==1.26.3
+3. sudo apt-get update && sudo apt-get install ffmpeg -y
 
 # 2. ollama 서버 실행 및 모델 다운로드
-
 a. curl -fsSL https://ollama.com/install.sh | sh
 b. ollama_run.py 파일 실행해서 ollama 서버 오픈
-c. ollama pull llama3.2 실행 후 모델 다운로드 + gemma3:4b 모델도 다운로드
+c. ollama pull gemma3:12b 모델 다운로드 -> A100 2g-20GB 인스턴스 이상
 
-# 3. 서버 실행 (변경 가능성 있음)
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload --root-path /proxy/8000
+# 3. 서버 실행
+uvicorn main:app --host 0.0.0.0 --port 8888 --reload --root-path /proxy/8888
 
 # 4. Swagger UI 접속
 http://localhost:8000/docs
@@ -77,6 +76,24 @@ http://localhost:8000/docs
 - .txt 파일 업로드
 - 음악 생성 → 병합
 - 응답으로 다운로드 링크 반환
+- 업로드된 파일명은 `secure_filename` 유틸리티로 정규화되어 한글 등 유니코드
+  문자는 유지하고, 라틴 문자의 악센트는 영문자로 변환합니다.
+
+### POST /generate/music-pages
+- 여러 페이지가 포함된 `.txt` 파일 업로드
+- 서버에서 자동으로 페이지 단위로 분할 후 각 페이지별 음악을 생성합니다.
+- 응답으로 각 페이지 `ch{n}.wav` 파일의 다운로드 링크 목록을 반환합니다.
+
+### POST /generate/music-v3
+- `page` 번호에 해당하는 텍스트만 선택해 감정 흐름을 나눠 음악을 생성합니다.
+- `preference` 필드에 `["피아노", "잔잔함"]` 같은 JSON 배열을 주면 선호도를 프롬프트에 반영합니다.
+- 잘못된 `page` 값이 전달되면 1 페이지가 기본으로 사용됩니다.
+
+
+### POST /generate/music-v3
+- `page` 번호에 해당하는 텍스트만 선택해 감정 흐름을 나눠 음악을 생성합니다.
+- `preference` 필드에 `["피아노", "잔잔함"]` 같은 JSON 배열을 주면 선호도를 프롬프트에 반영합니다.
+- 잘못된 `page` 값이 전달되면 1 페이지가 기본으로 사용됩니다.
 
 ### GET /download
 - 최종 생성된 `final_mix.wav` 다운로드

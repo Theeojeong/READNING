@@ -32,13 +32,18 @@ def find_turning_points_in_text(text: str) -> List[Dict[str, Any]]:
             points.append(p)
 
     # 위치 기반 정렬 및 최소 간격 필터
-    points.sort(key=lambda x: x["position_in_full_text"])
+    points.sort(key=lambda x: x.get("position_in_full_text", 0))
     filtered = []
-    min_gap = 300
+    min_gap = max(300, len(text) // 100)  # 텍스트 길이에 비례한 최소 간격
+    max_points = 20  # 최대 전환점 수 제한
+    
     for p in points:
-        pos = p["position_in_full_text"]
-        if pos - last_pos >= min_gap:
+        pos = p.get("position_in_full_text", 0)
+        if pos - last_pos >= min_gap and len(filtered) < max_points:
             filtered.append(p)
             last_pos = pos
-    log(f"전환점 {len(filtered)}개 확정")
+        elif len(filtered) >= max_points:
+            break  # 무한 루프 방지
+    
+    log(f"전환점 {len(filtered)}개 확정 (최대 {max_points}개 제한)")
     return filtered
