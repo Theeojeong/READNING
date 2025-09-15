@@ -1,0 +1,9 @@
+{
+  "projects": {
+    "default": "readning-3cb46",
+    "firebase storage:rules:set storage.rules": "readning-3cb46",
+    "firebase storage:set-cors cors.json": "readning-3cb46"
+  },
+  "targets": {},
+  "etags": {}
+}
