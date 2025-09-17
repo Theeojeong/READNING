@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Form, HTTPException
+from fastapi import APIRouter, Form, HTTPException, UploadFile, File
 
 from services import (
     chunk_text_by_emotion,
@@ -7,7 +7,7 @@ from services import (
     merge_service,
 )
 
-from utils.file_utils import save_text_to_file, ensure_dir
+from utils.file_utils import save_text_to_file, ensure_dir, secure_filename
 import os
 from config import OUTPUT_DIR, GEN_DURATION, TOTAL_DURATION
 
@@ -155,4 +155,165 @@ async def generate_music_by_chapter(
         "chapter_index": chapter_index,
         "chapter_title": chapter_title,
         "chunks": chunk_items,
+    }
+
+
+@router.post("/music-by-book", summary="책 파일 업로드 → 챕터/청크 음악 생성")
+async def generate_music_by_book(
+    file: UploadFile = File(...),
+    book_id: str = Form(...),
+):
+    """
+    업로드된 책 파일(txt/pdf/epub)을 받아 서버에서 챕터를 분리하고,
+    각 챕터를 감정 전환점 기준으로 청크 분리하여 청크별 음악을 생성합니다.
+
+    요청(form-data)
+    - file: 업로드 파일(.txt/.pdf/.epub)
+    - book_id: 책 식별자(출력 네임스페이스)
+
+    처리 개요
+    1) 파일 확장자에 따라 텍스트/챕터 추출
+       - .txt: 본문에서 제목 패턴(장 제목) 탐지하여 챕터 분리(없으면 전체를 1챕터로 간주)
+       - .pdf/.epub: 내부 변환 유틸 사용(services/ebooks2text)
+    2) 각 챕터마다 감정 청크 분리 → 청크별 음악 생성
+    3) 병합 없이 청크별 오디오를 고정 경로에 저장: gen_musics/{book_id}/ch{idx}/chunk_{i}.wav
+    4) 각 챕터의 청크 메타(오디오 URL/감정/텍스트 일부)를 응답으로 반환
+
+    주의
+    - 파일 크기/장수에 따라 처리 시간이 길어질 수 있습니다.
+    - 동일 챕터로 동시 요청 시 마지막 완료 파일이 최종 버전이 됩니다.
+    """
+
+    import os
+    from services.ebooks2text import detect_chapter_by_heading
+
+    filename = secure_filename(file.filename or "uploaded")
+    ext = os.path.splitext(filename)[1].lower()
+
+    # 1) 파일에서 텍스트/챕터 로드 ----------------------------------
+    chapters: list[dict] = []
+    if ext == ".txt":
+        raw = (await file.read()).decode("utf-8", errors="ignore")
+        detected = detect_chapter_by_heading(raw)
+        if not detected:
+            detected = [{"title": "Chapter 1", "content": raw.strip()}]
+        chapters = detected
+    elif ext in (".pdf", ".epub"):
+        # 업로드 파일을 임시 경로에 저장 후 변환 유틸 사용
+        tmp_dir = os.path.join(OUTPUT_DIR, "uploaded")
+        ensure_dir(tmp_dir)
+        tmp_path = os.path.join(tmp_dir, filename)
+        with open(tmp_path, "wb") as f:
+            f.write(await file.read())
+
+        from services.ebooks2text import convert_and_split
+        chapters = convert_and_split(tmp_path)
+    else:
+        raise HTTPException(400, "지원하지 않는 파일 형식입니다(.txt/.pdf/.epub)")
+
+    if not chapters:
+        raise HTTPException(400, "챕터를 추출하지 못했습니다")
+
+    # 2) 챕터별 처리 --------------------------------------------------
+    results = []
+    for idx, ch in enumerate(chapters):
+        title = ch.get("title", f"Chapter {idx+1}")
+        text = ch.get("content", "").strip()
+        if not text:
+            results.append({"index": idx, "title": title, "chunks": []})
+            continue
+
+        # generate_music_by_chapter 와 동일한 파이프라인(병렬 안전 작업 폴더 사용)
+        import time
+        work_dir_rel = os.path.join(book_id, f"ch{idx}__{int(time.time()*1000)}")
+        work_dir_abs = os.path.join(OUTPUT_DIR, work_dir_rel)
+        ensure_dir(work_dir_abs)
+
+        chapter_txt_path = os.path.join(work_dir_abs, f"ch{idx}.txt")
+        tmp_path = os.path.join(work_dir_abs, f"ch{idx}_tmp.txt")
+        save_text_to_file(chapter_txt_path, text)
+        save_text_to_file(tmp_path, text)
+
+        # 감정 청크 분리
+        try:
+            chunks = chunk_text_by_emotion.chunk_text_by_emotion(tmp_path)
+        except Exception as e:
+            print(f"[music-by-book] chunking error(ch{idx}):", e)
+            results.append({"index": idx, "title": title, "chunks": []})
+            continue
+
+        # 프롬프트 생성 및 regional 샘플 생성
+        try:
+            global_prompt = prompt_service.generate_global(text)
+            regional_prompts = []
+            for c in chunks:
+                chunk_text = c[0] if isinstance(c, (list, tuple)) else c
+                regional = prompt_service.generate_regional(chunk_text)
+                regional_prompts.append(
+                    prompt_service.compose_musicgen_prompt(global_prompt, regional)
+                )
+            saved_paths = musicgen_service.generate_music_samples(
+                global_prompt=global_prompt,
+                regional_prompts=regional_prompts,
+                book_id_dir=work_dir_rel,
+            )
+        except Exception as e:
+            print(f"[music-by-book] musicgen error(ch{idx}):", e)
+            results.append({"index": idx, "title": title, "chunks": []})
+            continue
+
+        # 안정 경로로 이동: gen_musics/{book_id}/ch{idx}/chunk_{i}.wav
+        stable_dir_rel = os.path.join(book_id, f"ch{idx}")
+        stable_dir_abs = os.path.join(OUTPUT_DIR, stable_dir_rel)
+        ensure_dir(stable_dir_abs)
+
+        chunk_items = []
+        for i, src_path in enumerate(saved_paths, start=1):
+            if not os.path.exists(src_path):
+                candidate = os.path.join(OUTPUT_DIR, work_dir_rel, f"regional_output_{i}.wav")
+                src = candidate if os.path.exists(candidate) else None
+            else:
+                src = src_path
+            if not src:
+                continue
+            dst = os.path.join(stable_dir_abs, f"chunk_{i}.wav")
+            try:
+                try:
+                    os.replace(src, dst)
+                except Exception:
+                    import shutil
+                    shutil.copyfile(src, dst)
+            except Exception as e:
+                print(f"[music-by-book] move chunk failed: {src} -> {dst}: {e}")
+                continue
+
+            # 메타데이터
+            emotions = None
+            next_transition = None
+            chunk_text_value = None
+            if i-1 < len(chunks):
+                chunk_text_value = chunks[i-1][0] if isinstance(chunks[i-1], (list, tuple)) and len(chunks[i-1]) > 0 else None
+                meta = chunks[i-1][1] if isinstance(chunks[i-1], (list, tuple)) and len(chunks[i-1]) > 1 else {}
+                emotions = meta.get("emotions") if isinstance(meta, dict) else None
+                next_transition = meta.get("next_transition") if isinstance(meta, dict) else None
+
+            chunk_items.append({
+                "index": i-1,
+                "audio_url": f"/{OUTPUT_DIR}/{stable_dir_rel}/chunk_{i}.wav",
+                "text": chunk_text_value,
+                "emotions": emotions,
+                "next_transition": next_transition,
+            })
+
+        results.append({
+            "index": idx,
+            "title": title,
+            "chunk_count": len(chunk_items),
+            "chunks": chunk_items,
+        })
+
+    return {
+        "message": f"총 {len(results)}개 챕터 처리 완료",
+        "book_id": book_id,
+        "chapters": results,
     }
