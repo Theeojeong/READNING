@@ -23,9 +23,9 @@ gen_musics/
 *.log
 
 # ignore generated audio
-gen_musics/
-*.wav
-*.env
+# gen_musics/
+# *.wav
+# *.env
 
 # Ignore local nltk cache
 nltk_data/
