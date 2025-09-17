@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
+import { BASE_AI_URL } from "../api/axiosInstance";
 
 type Props = {
   epubUrl: string;
   name: string;
+  bookId: string;
   currentIndex: number;
   setCurrentIndex: React.Dispatch<React.SetStateAction<number>>;
   externalAudioRef: React.MutableRefObject<HTMLAudioElement>;
@@ -18,6 +20,7 @@ type Chapter = {
 export default function EpubViewer({
   epubUrl,
   name: _name,
+  bookId,
   currentIndex,
   setCurrentIndex,
   externalAudioRef,
@@ -26,6 +29,11 @@ export default function EpubViewer({
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
+  const [chunkItems, setChunkItems] = useState<
+    { index: number; audio_url: string; text: string; emotions?: string }[]
+  >([]);
+  const [activeChunk, setActiveChunk] = useState(0);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     return () => {
@@ -89,6 +97,62 @@ export default function EpubViewer({
     }
   };
 
+  // 현재 보이는 청크 음악 자동 재생
+  useEffect(() => {
+    if (chunkItems.length === 0) return;
+    const url = chunkItems[activeChunk]?.audio_url;
+    if (!url) return;
+    const audio = externalAudioRef.current;
+    audio.pause();
+    audio.src = url;
+    audio.loop = true;
+    audio.load();
+    audio.play().catch(() => {});
+  }, [activeChunk, chunkItems]);
+
+  // IntersectionObserver로 보이는 청크 추적
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const sections = Array.from(container.querySelectorAll('[data-chunk-index]')) as HTMLElement[];
+    if (sections.length === 0) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const top = entries.filter(e => e.isIntersecting).sort((a,b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!top) return;
+        const idx = Number((top.target as HTMLElement).dataset.chunkIndex);
+        setActiveChunk((p) => (p !== idx ? idx : p));
+      },
+      { root: container, threshold: [0.2, 0.4, 0.6, 0.8] }
+    );
+    sections.forEach(sec => obs.observe(sec));
+    return () => obs.disconnect();
+  }, [chunkItems.length]);
+
+  // 청크 생성 호출
+  useEffect(() => {
+    const run = async () => {
+      if (!bookId || chapters.length === 0) return;
+      const ch = chapters[currentIndex];
+      if (!ch) return;
+      const fd = new FormData();
+      fd.append("book_id", bookId);
+      fd.append("chapter_index", String(currentIndex));
+      fd.append("chapter_title", ch.title);
+      fd.append("text", ch.content);
+      try {
+        const resp = await fetch(`${BASE_AI_URL}/generate/music-by-chapter`, { method: "POST", body: fd });
+        if (!resp.ok) throw new Error(`AI 서버 오류: ${resp.status}`);
+        const data = await resp.json();
+        setChunkItems(data.chunks || []);
+        setActiveChunk(0);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    run();
+  }, [bookId, currentIndex, chapters]);
+
   if (loading) {
     return (
       <Container>
@@ -128,8 +192,20 @@ export default function EpubViewer({
         </ChapterInfo>
       </ChapterHeader>
       
-      <ContentArea>
-        <ChapterContent>{currentChapter.content}</ChapterContent>
+      <ContentArea ref={scrollRef}>
+        {chunkItems.length > 0 ? (
+          chunkItems.map((ck) => (
+            <ChunkSection key={ck.index} data-chunk-index={ck.index}>
+              <ChunkHeader>
+                <span>청크 {ck.index + 1}</span>
+                {ck.emotions && <em>{ck.emotions}</em>}
+              </ChunkHeader>
+              <ChapterContent>{ck.text}</ChapterContent>
+            </ChunkSection>
+          ))
+        ) : (
+          <ChapterContent>{currentChapter.content}</ChapterContent>
+        )}
       </ContentArea>
 
       <NavigationButtons>
@@ -209,6 +285,24 @@ const ChapterContent = styled.div`
   font-size: 1.1rem;
   color: #333;
   white-space: pre-wrap;
+`;
+
+const ChunkSection = styled.section`
+  padding: 1rem 0;
+  border-bottom: 1px dashed #e0e0f5;
+`;
+
+const ChunkHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  color: #6b6b6b;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+
+  em {
+    font-style: normal;
+    color: #5f3dc4;
+  }
 `;
 
 const NavigationButtons = styled.div`

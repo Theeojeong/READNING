@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
+from starlette.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware ##프론트와 연결 위한 CORS설정 
 from routers import musicgen_upload_router
 from config import OUTPUT_DIR, FINAL_MIX_NAME
@@ -27,6 +28,10 @@ app.add_middleware(
 
 
 app.include_router(musicgen_upload_router.router)
+
+# 정적 파일 제공: 생성된 오디오 파일(gen_musics)을 직접 서빙
+# 예: /gen_musics/<book_id>/ch<chapter>/chunk_<i>.wav
+app.mount(f"/{OUTPUT_DIR}", StaticFiles(directory=OUTPUT_DIR), name="gen_musics")
 
 @app.get("/")
 def health_check():

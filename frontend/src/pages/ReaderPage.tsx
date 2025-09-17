@@ -379,6 +379,7 @@ export default function ReaderPage() {
                 key={book.id}
                 txtUrl={pdfUrl}
                 name={book.name}
+                bookId={book.id}
                 currentIndex={txtCurrentChapter}
                 setCurrentIndex={setTxtCurrentChapter}
                 externalAudioRef={audioRef}
@@ -389,6 +390,7 @@ export default function ReaderPage() {
                 key={book.id}
                 epubUrl={pdfUrl}
                 name={book.name}
+                bookId={book.id}
                 currentIndex={txtCurrentChapter}
                 setCurrentIndex={setTxtCurrentChapter}
                 externalAudioRef={audioRef}
