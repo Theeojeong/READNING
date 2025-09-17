@@ -28,9 +28,9 @@ app.add_middleware(
 
 app.include_router(musicgen_upload_router.router)
 
-@app.get("/")  # root 엔드포인트 , 서버 상태 체크 , 홈페이지 역할의 간단 JSON역할
-def root():
-    return { "message": "Readning API is running" }
+@app.get("/")
+def health_check():
+    return {"message": "Readning API is running"}
 
 
 @app.get("/gen_musics/{user_id}/{book_title}/ch{page}.wav")

@@ -32,3 +32,8 @@ nltk_data/
 
 =4.47
 keys/
+
+.python-version
+pyproject.toml
+src/
+uv.lock

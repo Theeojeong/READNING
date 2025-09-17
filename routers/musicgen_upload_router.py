@@ -25,8 +25,6 @@ router = APIRouter(prefix="/generate", tags = ["UploadWorkflow"])
 async def generate_music_from_upload_v3(
     file: UploadFile = File(...),
     book_id: str = Form(...),
-    # 프런트에서 JSON 배열을 문자열로 보내도록 합의
-    #   e.g.  ["잔잔한 피아노","자연 소리"]
     preference: str = Form("[]"),
     page: int = Form(1),
 ):
