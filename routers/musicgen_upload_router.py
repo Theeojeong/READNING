@@ -38,11 +38,11 @@ async def generate_music_by_chapter(
     2) 챕터 텍스트를 그대로 저장(재현/디버깅 용도)
     3) 감정 전환점 탐색 → 감정 단위 청크 분리
     4) 글로벌/리저널 프롬프트 생성 후 청크 개수만큼 regional 트랙 생성
-    5) 작업 폴더 내에서 트랙들을 병합하여 챕터 단일 음원 생성
-    6) 최종 파일을 프론트가 기대하는 고정 경로(gen_musics/{book_id}/ch{chapter_index}.wav)로 원자적 이동
+    5) 병합 없음. 각 청크별 음원을 "안정 경로"(gen_musics/{book_id}/ch{chapter_index}/chunk_{i}.wav)에 저장
+    6) 응답으로 청크 메타데이터(인덱스, 감정 정보, 오디오 URL)를 반환
 
     결과
-    - download_url: "/gen_musics/{book_id}/ch{chapter_index}.wav"
+    - chunks: [{ index, audio_url, emotions, next_transition } ...]
     - chapter_index, chapter_title 함께 반환
 
     오류 처리
@@ -91,7 +91,7 @@ async def generate_music_by_chapter(
             )
 
         #   생성된 regional 트랙은 작업 디렉터리(work_dir_rel)에 저장
-        musicgen_service.generate_music_samples(
+        saved_paths = musicgen_service.generate_music_samples(
             global_prompt=global_prompt,
             regional_prompts=regional_prompts,
             book_id_dir=work_dir_rel,
@@ -100,35 +100,59 @@ async def generate_music_by_chapter(
         print("[music-by-chapter] musicgen error:", e)
         raise HTTPException(500, "음악 생성 중 오류가 발생했습니다")
 
-    # 7) 챕터 단일 음원으로 병합
-    output_name = f"ch{chapter_index}.wav"
-    try:
-        #   병합은 작업 디렉터리 내부에서 수행
-        merged_path = merge_service.build_and_merge_clips_with_repetition(
-            text_chunks=chunks,
-            base_output_dir=OUTPUT_DIR,
-            book_id_dir=work_dir_rel,
-            output_name=output_name,
-            clip_duration=GEN_DURATION,
-            total_duration=target_len,
-            fade_ms=1500,
-        )
-        # 8) 최종 파일을 프론트가 기대하는 고정 경로로 이동(원자적 교체 우선)
-        final_out = os.path.join(OUTPUT_DIR, book_id, output_name)
+    # 7) 각 청크 오디오를 챕터별 안정 경로로 이동/복사 ------------------
+    #    안정 경로 예: gen_musics/{book_id}/ch{chapter_index}/chunk_{i}.wav
+    stable_dir_rel = os.path.join(book_id, f"ch{chapter_index}")
+    stable_dir_abs = os.path.join(OUTPUT_DIR, stable_dir_rel)
+    ensure_dir(stable_dir_abs)
+
+    chunk_items = []
+    for i, src_path in enumerate(saved_paths, start=1):
+        # 일부 모델이 비동기로 파일을 저장하는 경우를 대비해 존재 확인
+        if not os.path.exists(src_path):
+            # 작업 폴더 내 규칙에 따라 직접 구성
+            candidate = os.path.join(OUTPUT_DIR, work_dir_rel, f"regional_output_{i}.wav")
+            src = candidate if os.path.exists(candidate) else None
+        else:
+            src = src_path
+
+        if not src:
+            # 누락된 경우 스킵 (프론트는 존재하는 청크만 사용)
+            continue
+
+        dst = os.path.join(stable_dir_abs, f"chunk_{i}.wav")
         try:
-            # 가능하면 os.replace로 원자적 이동
-            os.replace(merged_path, final_out)
-        except Exception:
-            # 일부 파일시스템에서 실패 시 복사로 대체
-            import shutil
-            shutil.copyfile(merged_path, final_out)
-    except Exception as e:
-        print("[music-by-chapter] merge error:", e)
-        raise HTTPException(500, "오디오 병합 중 오류가 발생했습니다")
+            try:
+                os.replace(src, dst)
+            except Exception:
+                import shutil
+                shutil.copyfile(src, dst)
+        except Exception as e:
+            print(f"[music-by-chapter] move chunk failed: {src} -> {dst}: {e}")
+            continue
+
+        # 청크 메타데이터 구성
+        emotions = None
+        next_transition = None
+        chunk_text_value = None
+        if i-1 < len(chunks):
+            # chunks 요소는 (chunk_text, meta) 형태
+            chunk_text_value = chunks[i-1][0] if isinstance(chunks[i-1], (list, tuple)) and len(chunks[i-1]) > 0 else None
+            meta = chunks[i-1][1] if isinstance(chunks[i-1], (list, tuple)) and len(chunks[i-1]) > 1 else {}
+            emotions = meta.get("emotions") if isinstance(meta, dict) else None
+            next_transition = meta.get("next_transition") if isinstance(meta, dict) else None
+
+        chunk_items.append({
+            "index": i-1,
+            "audio_url": f"/{OUTPUT_DIR}/{stable_dir_rel}/chunk_{i}.wav",
+            "text": chunk_text_value,
+            "emotions": emotions,
+            "next_transition": next_transition,
+        })
 
     return {
-        "message": f"챕터 {chapter_index} 음원 생성 완료",
-        "download_url": f"/{OUTPUT_DIR}/{book_id}/{output_name}",
+        "message": f"챕터 {chapter_index} 청크 {len(chunk_items)}개 생성 완료",
         "chapter_index": chapter_index,
         "chapter_title": chapter_title,
+        "chunks": chunk_items,
     }
