@@ -18,14 +18,12 @@ from typing import List
 from pathlib import Path 
 from services.repeat_track import repeat_clips_to_length
 
-
 router = APIRouter(prefix="/generate", tags = ["UploadWorkflow"])
 
 @router.post("/music-v3")
 async def generate_music_from_upload_v3(
     file: UploadFile = File(...),
     book_id: str = Form(...),
-    preference: str = Form("[]"),
     page: int = Form(1),
 ):
     """페이지를 분할한 뒤 해당 페이지를 감정 단위로 나눠 음악을 생성한다."""
@@ -63,15 +61,6 @@ async def generate_music_from_upload_v3(
         OUTPUT_DIR, "uploaded", f"{chapter_dir}_tmp.txt")
     save_text_to_file(tmp_path, page_text)
 
-    # ── 2) preference 파싱 ───────────────────────────────────────
-    try:
-        pref_list: List[str] = json.loads(preference)
-        if not isinstance(pref_list, list):
-            raise ValueError
-    except Exception:
-        print("[!] preference 파싱 실패: 기본값 [] 사용")
-        pref_list = []
-
     # ── 3) 감정-청크 분할 ─────────────────────────────────────────
     chunks = chunk_text_by_emotion.chunk_text_by_emotion(tmp_path)
     print(f"청크 개수: {len(chunks)}")
@@ -83,11 +72,10 @@ async def generate_music_from_upload_v3(
         chunk_text = chunk[0] if isinstance(chunk, (list, tuple)) else chunk
         regional = prompt_service.generate_regional(chunk_text)
 
-        # 취향을 한 줄 덧붙여서 compose
-        pref_line = f"User preference: {', '.join(pref_list)}" if pref_list else ""
+        # compose
         music_prompts.append(
             prompt_service.compose_musicgen_prompt(
-                global_prompt, f"{regional}\n{pref_line}"
+                global_prompt, f"{regional}"
             )
         )
 
@@ -136,7 +124,6 @@ async def generate_music_long(
     user_id: str     = Form(...),
     book_title: str  = Form(...),
     page: int        = Form(..., ge=0),
-    preference: str  = Form("[]"),
     target_len: int  = Form(240),
 ):
 
@@ -164,14 +151,6 @@ async def generate_music_long(
     tmp_path = os.path.join(abs_bookdir, f"ch{page}_tmp.txt")
     save_text_to_file(tmp_path, text)
 
-    # 3) preference 파싱 --------------------------------------------
-    try:
-        pref_list: List[str] = json.loads(preference)
-        if not isinstance(pref_list, list):
-            raise ValueError
-    except Exception:
-        raise HTTPException(400, "preference 는 JSON 배열 형식이어야 합니다")
-
     # 4) 청크 분할 ----------------------------------------------------
     try:
         chunks = chunk_text_by_emotion.chunk_text_by_emotion(tmp_path)
@@ -186,9 +165,8 @@ async def generate_music_long(
         for chunk in chunks:
             ctxt = chunk[0] if isinstance(chunk, (list, tuple)) else chunk
             regional = prompt_service.generate_regional(ctxt)
-            pref_line = f"User preference: {', '.join(pref_list)}" if pref_list else ""
             rp.append(prompt_service.compose_musicgen_prompt(
-                global_prompt, f"{regional}\n{pref_line}"
+                global_prompt, f"{regional}"
             ))
         musicgen_service.generate_music_samples(
             global_prompt=global_prompt,

@@ -15,12 +15,7 @@ def repeat_clips_to_length(
     crossfade_ms: int = 1500,
     output_name: str = "final_mix.wav",
 ):
-    """
-    • 길이 0 ms 클립 skip
-    • crossfade > clip 길이면 축소
-    • track 길이 0일 때 crossfade = 0
-    • clip_duration 이 0/None 이면 첫 클립 길이(sec)를 사용
-    """
+
     # ① 클립 로딩 ------------------------------------------------------
     clips: list[AudioSegment] = []
     for idx in range(1, 9999):

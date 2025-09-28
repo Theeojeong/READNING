@@ -21,7 +21,6 @@ def ensure_punkt() -> None:
 ensure_punkt() 
 
 def split_text_into_processing_segments(text: str) -> Generator[Tuple[str, int], None, None]:
-    
     """
     원리(요약)
     
@@ -63,5 +62,4 @@ def split_text_into_processing_segments(text: str) -> Generator[Tuple[str, int],
             break
         start = max(start + 1, end - OVERLAP_SIZE) # 다음 청크 시작 위치 갱신
                                                    # (겹침 OVERLAP_SIZE 만큼 뒤로 물러서 맥락 유지)
-
     log("텍스트 분할 완료")

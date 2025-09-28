@@ -21,7 +21,7 @@ def generate_music_samples(
     
     print("Loading MusicGen model...")
     model = musicgen_manager.get_model()
-    sr = musicgen_manager.sample_rate
+    sample_rate = musicgen_manager.sample_rate
     
     print("[1] Generating global melody...")
     base_wav = model.generate([global_prompt])[0]
@@ -31,7 +31,7 @@ def generate_music_samples(
     saved_paths = []
     for i, prompt in enumerate(regional_prompts):
         print(f"[2] Generating regional variation {i+1}/{len(regional_prompts)}")
-        wav = model.generate_with_chroma([prompt], melody, sr)[0]
+        wav = model.generate_with_chroma([prompt], melody, sample_rate)[0]
         # Update melody to pass to next chunk
         melody = wav
 

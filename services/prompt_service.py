@@ -3,18 +3,15 @@ import ollama
 def generate_global(text_chunk):
     prompt = f"""
 You are creating a cinematic background music prompt for an AI music generator.
-
 Step 1: Write a **one-line summary** of the emotional tone and setting of the full text. Focus on the mood, relationships, or themes — not plot details.
-
 Step 2: Write **one sentence** describing ideal background music that matches this story. Use emotional and musical terms, not composer names or musical eras.
-
 Do NOT summarize the story. Do NOT mention any composers. Only describe the feeling and sound of the music.
 
 Format:
-Scene Summary: [One emotional or atmospheric sentence]  
+Scene Summary: [One emotional or atmospheric sentence]
 Global Music Theme: [One sentence describing the ideal music: mood, genre, instruments, tempo, and evolution]
 
-✅ Example:
+Example:
 Scene Summary: A tender and quiet reflection on lost love and the warmth of shared memories.  
 Global Music Theme: A slow, emotional piano-driven score with soft ambient textures and subtle string swells that evolve gently over time.
 
@@ -30,7 +27,7 @@ def generate_regional(text_chunk):
     prompt = f"""
 You are generating a **compact music prompt** for a text-to-music AI based on the scene below.
 
-🎯 Your goal: extract only key musical elements — keep it concise, direct, and focused on the sound.
+Your goal: extract only key musical elements — keep it concise, direct, and focused on the sound.
 
 Respond using this minimal format:
 Scene: [5–10 words]
@@ -40,7 +37,7 @@ Instruments: [2–4 key instruments/sounds]
 Tempo: [BPM or brief description]
 Progression: [how it evolves, in <10 words]
 
-✅ Example:
+Example:
 Scene: Detective walks through abandoned asylum  
 Emotions: Eerie, tense  
 Mood & Style: Dark ambient  
