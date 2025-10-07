@@ -51,7 +51,7 @@ def repeat_clips_to_length(
             track = track.append(clip, crossfade=(0 if len(track) == 0 else cf))
 
     # ⑤ 자르기 & 저장 --------------------------------------------------
-    track = track[: target_sec * 1000]
+    track = track[:target_sec * 1000]
     out_path = os.path.join(folder, output_name)
     track.export(out_path, "wav")
     logger.info(f"[repeat_track] saved {out_path} ({len(track)} ms)")

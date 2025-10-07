@@ -1,0 +1,59 @@
+[project]
+name = "readning"
+version = "0.1.0"
+description = "AI-powered reading music generation service"
+readme = "README.md"
+authors = [
+    { name = "Theeojeong", email = "wogusto13@gmail.com" }
+]
+requires-python = ">=3.11,<3.12"
+
+dependencies = [
+    # Web Framework
+    "fastapi>=0.116.1,<0.120.0",
+    "uvicorn[standard]>=0.35.0,<0.36.0",
+    "pydantic-settings>=2.10.1,<3.0.0",
+    "python-multipart>=0.0.20,<0.1.0",
+    
+    # PyTorch (버전 고정 - 충돌 방지)
+    "torch==2.1.0",
+    "torchaudio==2.1.0",
+    "torchvision==0.16.0",
+    "numpy==1.26.3",
+    "transformers==4.41.2",
+    
+    # Audio Processing
+    "audiocraft",
+    "pydub>=0.25.1,<0.26.0",
+    
+    # Text Processing
+    "nltk>=3.9.1,<4.0.0",
+    "beautifulsoup4>=4.12.3,<5.0.0",
+    "ebooklib>=0.18,<1.0",
+    "pymupdf>=1.24.0,<2.0.0",
+    
+    # LLM
+    "ollama>=0.3.0,<1.0.0",
+    
+    # File Handling
+    "aiofiles>=24.1.0,<25.0.0",
+    
+    # Firebase
+    "firebase-admin>=6.5.0,<8.0.0",
+    
+    # Utilities
+    "python-dotenv>=1.0.1,<2.0.0",
+    "requests>=2.32.0,<3.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+audiocraft = { git = "https://github.com/facebookresearch/audiocraft.git", rev = "main" }
+
+[tool.uv.workspace]
+members = [
+    "scrollama",
+]

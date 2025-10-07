@@ -98,12 +98,6 @@ def chunk_by_sentences(text, n=300):
 
 
 def split_txt_into_pages(text_or_path: str) -> List[str]:
-    """Split raw text into page-sized chunks similar to the frontend.
-
-    This uses the same logic as ``split_text_into_processing_segments`` to
-    ensure pages do not cut sentences abruptly. ``text_or_path`` may be either
-    a string of text or a path to a ``.txt`` file.
-    """
 
     if os.path.exists(text_or_path):
         with open(text_or_path, "r", encoding="utf-8") as f:

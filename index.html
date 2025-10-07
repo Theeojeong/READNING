@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reading BGM Demo</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">Reading BGM</div>
+      <div class="controls">
+        <button id="enable-audio" class="primary">오디오 활성화</button>
+        <label class="control">
+          <input type="checkbox" id="auto-switch" checked />
+          자동 전환
+        </label>
+        <label class="control">
+          음량
+          <input type="range" id="volume" min="0" max="1" step="0.01" value="0.7" />
+        </label>
+        <button id="mute">음소거</button>
+      </div>
+    </header>
+
+    <main class="container">
+      <article id="reader" class="reader"></article>
+      <aside class="debug" id="debug" hidden>
+        <div>Active: <span id="dbg-active">-</span></div>
+        <div id="dbg-list"></div>
+      </aside>
+    </main>
+
+    <template id="chunk-template">
+      <section class="chunk" data-chunk-id="">
+        <h2 class="chunk-title"></h2>
+        <p class="chunk-text"></p>
+      </section>
+    </template>
+
+    <script type="module" src="src/app.js"></script>
+  </body>
+  </html>
+

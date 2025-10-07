@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scrollama + Audio 테스트</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+
+        #intro {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #intro h1 {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        #intro p {
+            font-size: 1.5rem;
+            opacity: 0.9;
+        }
+
+        #scrolly {
+            position: relative;
+            display: flex;
+            padding: 40px 0;
+            background: white;
+        }
+
+        article {
+            position: relative;
+            padding: 0;
+            width: 45%;
+            margin-left: 5%;
+        }
+
+        .step {
+            margin: 0 auto 150vh 0;
+            padding: 40px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            opacity: 0.3;
+            transition: all 0.3s ease;
+        }
+
+        .step.active {
+            opacity: 1;
+            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.3);
+            transform: scale(1.02);
+        }
+
+        .step:last-child {
+            margin-bottom: 50vh;
+        }
+
+        .step h2 {
+            font-size: 2rem;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .step p {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            color: #555;
+        }
+
+        figure {
+            position: sticky;
+            width: 20%;
+            height: 100vh;
+            top: 0;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .audio-container {
+            text-align: center;
+            color: white;
+            padding: 40px;
+        }
+
+        .audio-title {
+            font-size: 2rem;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        audio {
+            width: 100%;
+            max-width: 400px;
+            margin: 20px 0;
+            filter: brightness(0.95);
+        }
+
+        .audio-info {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-top: 20px;
+        }
+
+        .waveform {
+            width: 300px;
+            height: 100px;
+            margin: 30px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .bar {
+            width: 6px;
+            height: 20px;
+            background: rgba(255,255,255,0.6);
+            border-radius: 3px;
+            animation: wave 1s ease-in-out infinite;
+        }
+
+        .bar:nth-child(1) { animation-delay: 0s; }
+        .bar:nth-child(2) { animation-delay: 0.1s; }
+        .bar:nth-child(3) { animation-delay: 0.2s; }
+        .bar:nth-child(4) { animation-delay: 0.3s; }
+        .bar:nth-child(5) { animation-delay: 0.4s; }
+        .bar:nth-child(6) { animation-delay: 0.5s; }
+        .bar:nth-child(7) { animation-delay: 0.6s; }
+
+        @keyframes wave {
+            0%, 100% { height: 20px; }
+            50% { height: 80px; }
+        }
+
+        #outro {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 2rem;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.1s ease;
+            z-index: 1000;
+        }
+
+        .instructions {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.95);
+            padding: 15px 30px;
+            border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            font-size: 0.9rem;
+            color: #667eea;
+            z-index: 100;
+            animation: fadeIn 1s ease-in;
+        }
+
+        .play-hint {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(102, 126, 234, 0.95);
+            color: white;
+            padding: 40px 60px;
+            border-radius: 20px;
+            font-size: 1.5rem;
+            text-align: center;
+            z-index: 2000;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .play-hint:hover {
+            transform: translate(-50%, -50%) scale(1.05);
+            box-shadow: 0 15px 50px rgba(0,0,0,0.4);
+        }
+
+        .play-hint.hidden {
+            display: none;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            #scrolly {
+                flex-direction: column;
+            }
+            
+            article, figure {
+                width: 100%;
+            }
+            
+            figure {
+                position: relative;
+                height: 50vh;
+            }
+            
+            article {
+                margin-left: 0;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="progress-bar" id="progressBar"></div>
+    
+    <section id="intro">
+        <h1>📜 Scrollama + Audio 데모</h1>
+        <p>스크롤하면서 이야기를 읽고 음악을 감상하세요</p>
+        <div style="margin-top: 40px; font-size: 3rem; animation: bounce 2s ease-in-out infinite;">⬇️</div>
+    </section>
+
+    <section id="scrolly">
+        <article>
+            <div class="step" data-step="1" data-audio="audio1">
+                <h2>🌅 시작</h2>
+                <p>
+                    새로운 하루가 시작됩니다. 
+                    창밖으로 부드러운 햇살이 들어오고, 
+                    새들의 지저귐이 들립니다.
+                    오늘은 어떤 이야기를 만들어갈까요?
+                </p>
+                <p style="margin-top: 15px; color: #999; font-size: 0.9rem;">
+                    💡 오른쪽에 오디오 플레이어가 나타납니다
+                </p>
+            </div>
+
+            <div class="step" data-step="2" data-audio="audio2">
+                <h2>🚶 여정</h2>
+                <p>
+                    첫 발걸음을 내딛습니다. 
+                    길은 때로는 평탄하고, 때로는 험난합니다.
+                    하지만 모든 순간이 의미 있는 경험이 됩니다.
+                    음악과 함께 천천히 걸어가봅시다.
+                </p>
+            </div>
+
+            <div class="step" data-step="3" data-audio="audio3">
+                <h2>🌟 발견</h2>
+                <p>
+                    여정 중에 특별한 것을 발견합니다.
+                    작은 것에서도 큰 의미를 찾을 수 있습니다.
+                    때로는 멈춰서 주변을 둘러보는 것도 중요합니다.
+                    이 순간을 음악과 함께 느껴보세요.
+                </p>
+            </div>
+
+            <div class="step" data-step="4" data-audio="audio4">
+                <h2>🌈 절정</h2>
+                <p>
+                    이야기는 클라이맥스에 도달합니다.
+                    모든 경험이 하나로 모여 아름다운 순간을 만듭니다.
+                    음악이 더욱 풍성해지고, 감정이 고조됩니다.
+                    이 특별한 순간을 만끽하세요.
+                </p>
+            </div>
+
+            <div class="step" data-step="5" data-audio="audio5">
+                <h2>🌙 마무리</h2>
+                <p>
+                    모든 여정에는 끝이 있습니다.
+                    하지만 끝은 또 다른 시작을 의미합니다.
+                    오늘의 경험을 가슴에 담고,
+                    내일의 새로운 이야기를 기대해봅니다.
+                </p>
+            </div>
+        </article>
+
+        <figure>
+            <div class="audio-container">
+                <div class="audio-title" id="audioTitle">오디오가 곧 재생됩니다</div>
+                <div class="waveform">
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                </div>
+                <audio id="audioPlayer" controls>
+                    <source src="" type="audio/mpeg">
+                    브라우저가 오디오를 지원하지 않습니다.
+                </audio>
+                <div class="audio-info" id="audioInfo">
+                    스크롤하여 다음 섹션으로 이동하세요
+                </div>
+            </div>
+        </figure>
+    </section>
+
+    <section id="outro">
+        <div>
+            <h2>✨ 감사합니다 ✨</h2>
+            <p style="font-size: 1.2rem; margin-top: 20px;">
+                Scrollama를 이용한 인터랙티브 스토리텔링
+            </p>
+        </div>
+    </section>
+
+    <!-- 자동 재생 활성화를 위한 힌트 -->
+    <div class="play-hint" id="playHint">
+        🎵<br>
+        클릭하여 오디오 자동 재생 시작
+    </div>
+
+    <script src="build/scrollama.js"></script>
+    <script>
+        // 여기에 실제 오디오 파일 경로를 입력하세요
+        const audioFiles = {
+            audio1: 'audio/track1.wav',  // 실제 파일 경로로 변경
+            audio2: 'audio/track2.wav',
+            audio3: 'audio/track3.wav',
+            audio4: 'audio/track4.mp3',
+            audio5: 'audio/track5.mp3'
+        };
+
+        const audioTitles = {
+            audio1: '🌅 아침의 시작',
+            audio2: '🚶 여정의 음악',
+            audio3: '🌟 발견의 순간',
+            audio4: '🌈 클라이맥스',
+            audio5: '🌙 평화로운 마무리'
+        };
+
+        const audioPlayer = document.getElementById('audioPlayer');
+        const audioTitle = document.getElementById('audioTitle');
+        const audioInfo = document.getElementById('audioInfo');
+        const progressBar = document.getElementById('progressBar');
+        const playHint = document.getElementById('playHint');
+
+        // 자동 재생 활성화 상태
+        let autoPlayEnabled = false;
+
+        // 첫 클릭으로 자동 재생 활성화
+        playHint.addEventListener('click', () => {
+            autoPlayEnabled = true;
+            playHint.classList.add('hidden');
+            console.log('✅ 자동 재생이 활성화되었습니다!');
+            
+            // 첫 번째 오디오 재생 시도
+            if (audioPlayer.src) {
+                audioPlayer.play().catch(e => console.log('재생 실패:', e));
+            }
+        });
+
+        // 스크롤해도 힌트 숨기기
+        let scrolled = false;
+        window.addEventListener('scroll', () => {
+            if (!scrolled && window.scrollY > 100) {
+                scrolled = true;
+                autoPlayEnabled = true;
+                setTimeout(() => {
+                    playHint.classList.add('hidden');
+                }, 2000);
+            }
+        }, { once: false });
+
+        // Scrollama 초기화
+        const scroller = scrollama();
+
+        scroller
+            .setup({
+                step: '.step',
+                offset: 0.5,
+                debug: false
+            })
+            .onStepEnter(response => {
+                // 이전 active 클래스 제거
+                document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+                
+                // 현재 step에 active 클래스 추가
+                response.element.classList.add('active');
+                
+                // 오디오 변경
+                const audioId = response.element.dataset.audio;
+                const audioSrc = audioFiles[audioId];
+                const title = audioTitles[audioId];
+                
+                audioTitle.textContent = title;
+                audioInfo.textContent = `Step ${response.index + 1} / 5`;
+                
+                // 오디오 소스 변경 및 자동 재생
+                audioPlayer.src = audioSrc;
+                audioPlayer.load(); // 새 소스 로드
+                
+                // 🎵 자동 재생 (활성화된 경우만)
+                if (autoPlayEnabled) {
+                    audioPlayer.play()
+                        .then(() => {
+                            console.log(`✅ 자동 재생 시작: ${title}`);
+                        })
+                        .catch(e => {
+                            console.log('⚠️ 자동 재생 실패:', e.message);
+                            audioInfo.textContent = '▶️ 재생 버튼을 눌러주세요';
+                        });
+                }
+            })
+            .onStepExit(response => {
+                response.element.classList.remove('active');
+                
+                // 🎵 음악 부드럽게 페이드 아웃
+                if (autoPlayEnabled && !audioPlayer.paused) {
+                    const fadeOut = setInterval(() => {
+                        if (audioPlayer.volume > 0.1) {
+                            audioPlayer.volume -= 0.1;
+                        } else {
+                            clearInterval(fadeOut);
+                            audioPlayer.volume = 1.0; // 다음 곡을 위해 볼륨 복원
+                        }
+                    }, 50);
+                }
+            });
+
+        // 스크롤 진행률 표시
+        window.addEventListener('scroll', () => {
+            const windowHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            const scrolled = (window.scrollY / windowHeight) * 100;
+            progressBar.style.width = scrolled + '%';
+        });
+
+        // 리사이즈 처리 (자동으로 처리되지만 명시적으로 추가 가능)
+        window.addEventListener('resize', scroller.resize);
+
+        console.log('🎵 Scrollama + Audio 데모가 준비되었습니다!');
+        console.log('📁 오디오 파일을 audio/ 폴더에 넣고 경로를 수정하세요:');
+        console.log('   - audio/track1.mp3');
+        console.log('   - audio/track2.mp3');
+        console.log('   - audio/track3.mp3');
+        console.log('   - audio/track4.mp3');
+        console.log('   - audio/track5.mp3');
+    </script>
+
+    <style>
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+    </style>
+</body>
+</html>
+

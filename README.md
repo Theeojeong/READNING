@@ -48,6 +48,80 @@ http://localhost:8000/docs
 
 ---
 
+## 🧰 백엔드 실행 (FastAPI)
+
+사전 준비
+- Python 3.9 (권장), FFmpeg 설치 필요
+- 가상환경 사용 권장: 프로젝트 루트(`main.py`가 있는 위치)에서 실행
+
+가상환경 생성/활성화
+```bash
+# Linux/macOS
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Windows (PowerShell)
+python -m venv .venv
+.venv\\Scripts\\Activate.ps1
+```
+
+의존성 설치
+```bash
+pip install -r requirements.txt
+```
+
+서버 실행
+```bash
+# 로컬 개발 기본 (권장)
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+# 프록시/터널 환경에서 사용 시 예시
+# uvicorn main:app --host 0.0.0.0 --port 8888 --reload --root-path /proxy/8888
+```
+
+Swagger UI
+- 기본: http://localhost:8000/docs
+- 프록시 예시 사용 시: http://localhost:8888/proxy/8888/docs
+
+---
+
+## 🖥️ 프론트엔드 실행 (React + Vite)
+
+사전 준비
+- Node.js 18 이상, npm 9 이상 권장
+
+개발 서버 실행
+```bash
+# 1) 프론트엔드 디렉토리로 이동
+cd frontend
+
+# 2) 의존성 설치 (최초 1회)
+npm install
+
+# 3) 개발 서버 실행
+npm run dev
+
+# 4) 브라우저에서 접속 (기본)
+http://localhost:5173
+```
+
+프로덕션 빌드/미리보기
+```bash
+cd frontend
+
+# 빌드 산출물 생성 (dist/)
+npm run build
+
+# 로컬 미리보기 (정적 서버)
+npm run preview
+```
+
+백엔드 API 연동
+- 프론트엔드가 호출하는 백엔드 주소는 `frontend/src/api/axiosInstance.tsx`의 `BASE_AI_URL`에서 설정합니다.
+- 로컬 백엔드를 사용하려면 해당 값을 로컬 서버 주소로 변경하세요. 예: `http://localhost:8888` 또는 환경에 맞는 포트.
+
+---
+
 ## 📂 디렉토리 구조
 
 ```

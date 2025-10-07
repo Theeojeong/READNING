@@ -1,0 +1,84 @@
+┌──────────────────────────────────────────────────────────────┐
+│                  .gitignore 주요 무시 항목                    │
+└──────────────────────────────────────────────────────────────┘
+
+✅ 올리지 않는 것 (Git 무시)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔐 비밀 정보
+   .env, *.key, firebase-credentials.json
+   → 이유: 보안 (절대 공개하면 안 됨!)
+
+💾 데이터베이스
+   mysql-data/, *.db, *.sqlite
+   → 이유: 로컬 데이터, 용량 큼
+
+🎵 생성된 음악 파일
+   gen_musics/, *.wav, *.mp3
+   → 이유: 용량 매우 큼 (GB 단위), API로 재생성 가능
+
+🐍 Python 캐시
+   __pycache__/, *.pyc, .venv/
+   → 이유: 자동 생성됨
+
+🎨 Node.js
+   node_modules/, npm-debug.log
+   → 이유: 용량 큼, package.json으로 복원 가능
+
+🔧 IDE 설정
+   .vscode/, .idea/
+   → 이유: 개인 설정
+
+📝 로그/임시
+   *.log, *.tmp, .pytest_cache/
+   → 이유: 런타임 생성 파일
+
+🤖 ML 모델
+   nltk_data/, models/, *.pt, .audiocraft/
+   → 이유: 매우 큼, 다운로드 가능
+
+📱 OS 파일
+   .DS_Store, Thumbs.db
+   → 이유: 시스템 파일
+
+
+✅ 올려야 하는 것 (Git 포함)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📄 프로젝트 설정
+   pyproject.toml, requirements.txt, package.json
+   docker-compose.yml, uv.lock
+
+💻 소스 코드
+   src/, services/, routers/, utils/
+   frontend/src/
+
+📚 문서
+   README.md, *.md 가이드 파일들
+
+🗄️ DB 스키마
+   init-db.sql
+
+🧪 공식 테스트
+   test_mysql_connection.py, test_health_check.py
+
+
+⚠️ 주의사항
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. .env 파일은 절대 커밋하지 말 것!
+   대신 .env.example 제공
+
+2. 대용량 파일(>100MB)은 GitHub 제한 초과
+   → S3, Git LFS 사용 고려
+
+3. 실수로 커밋한 비밀 정보는 즉시 재발급!
+   git history에서도 제거 필요
+
+
+📊 확인 명령어
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+git status --ignored              # 무시되는 파일 확인
+git check-ignore -v <파일>        # 특정 파일이 무시되는지 확인
+git rm --cached <파일>            # 이미 추적 중인 파일 제거
+
+
+상세 정보: GITIGNORE_GUIDE.md 참고
+

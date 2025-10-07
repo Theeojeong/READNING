@@ -6,18 +6,11 @@
 import os
 from typing import List, Tuple, Dict, Any
 from utils.logger import log
-from utils.file_utils import load_text_from_file
 from services.find_turning_points_in_text import find_turning_points_in_text
 
 
-def chunk_text_by_emotion(file_path: str) -> List[Tuple[str, Dict[str, Any]]]:
+def chunk_text_by_emotion(text: str) -> List[Tuple[str, Dict[str, Any]]]:
     """메모리 효율적인 텍스트 청킹"""
-    try:
-        # 개선된 파일 읽기 함수 사용 (인코딩 에러 처리)
-        text = load_text_from_file(file_path)
-    except Exception as e:
-        log(f"파일 읽기 오류: {e}")
-        return []
 
     text_len = len(text)
     log(f"파일 길이: {text_len:,}자")

@@ -1,0 +1,31 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: readning-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: readning2024
+      MYSQL_DATABASE: readning
+      MYSQL_USER: readning_user
+      MYSQL_PASSWORD: readning_pass
+    ports:
+      - "3307:3306"  # 호스트:3307 -> 컨테이너:3306
+    volumes:
+      - ./mysql-data:/var/lib/mysql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  # 선택사항: phpMyAdmin (웹 기반 MySQL 관리)
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: readning-phpmyadmin
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: readning2024
+    depends_on:
+      - mysql
+

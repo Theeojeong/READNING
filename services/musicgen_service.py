@@ -38,7 +38,7 @@ def generate_music_samples(
         # Save & Listen
         filename = f"regional_output_{i+1}"
         path = os.path.join(base_output_dir, book_id_dir, filename)
-        audio_write(path, wav.cpu(), sr, strategy="loudness", loudness_compressor=True)
+        audio_write(path, wav.cpu(), sample_rate, strategy="loudness", loudness_compressor=True)
         saved_paths.append(f"{path}.wav")
 
     return saved_paths
