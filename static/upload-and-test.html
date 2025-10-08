@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📚 Readning 테스트 페이지</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+
+        .step {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-left: 5px solid #667eea;
+        }
+
+        .step h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-weight: 600;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .status.info {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            color: #1565c0;
+        }
+
+        .status.success {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            color: #2e7d32;
+        }
+
+        .status.error {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+            color: #c62828;
+        }
+
+        .status.loading {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            color: #e65100;
+        }
+
+        .loader {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result-link {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 8px;
+            text-decoration: none;
+            margin-top: 15px;
+            transition: background 0.3s;
+        }
+
+        .result-link:hover {
+            background: #5568d3;
+        }
+
+        .info-box {
+            background: #f0f4ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+            color: #555;
+        }
+
+        .info-box strong {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📚 Readning 테스트</h1>
+        <p class="subtitle">텍스트 파일을 업로드하고 음악을 생성해보세요</p>
+
+        <!-- Step 1: 파일 업로드 -->
+        <div class="step">
+            <h2>🎵 Step 1: 음악 생성</h2>
+            
+            <div class="info-box">
+                <strong>💡 참고:</strong> 텍스트 파일을 업로드하면 감정 기반으로 청크가 분할되고, 각 청크별로 음악이 생성됩니다. (약 1-5분 소요)
+            </div>
+
+            <form id="uploadForm">
+                <div class="form-group">
+                    <label>📄 텍스트 파일</label>
+                    <input type="file" id="fileInput" accept=".txt" required>
+                </div>
+
+                <div class="form-group">
+                    <label>👤 사용자 ID</label>
+                    <input type="text" id="userId" value="test_user" required placeholder="예: test_user">
+                </div>
+
+                <div class="form-group">
+                    <label>📖 책 제목</label>
+                    <input type="text" id="bookTitle" required placeholder="예: my_novel">
+                </div>
+
+                <div class="form-group">
+                    <label>📄 페이지 번호</label>
+                    <input type="number" id="page" value="1" min="1" required>
+                </div>
+
+                <div class="form-group">
+                    <label>⏱️ 음악 길이 (초)</label>
+                    <input type="number" id="targetLen" value="240" min="30" step="30">
+                </div>
+
+                <button type="submit" class="btn" id="uploadBtn">
+                    🎵 음악 생성하기
+                </button>
+            </form>
+
+            <div id="uploadStatus" class="status"></div>
+        </div>
+
+        <!-- Step 2: 리더로 이동 -->
+        <div class="step">
+            <h2>📖 Step 2: 동적 리더에서 확인</h2>
+            <p style="margin-bottom: 15px; color: #666;">
+                음악 생성이 완료되면 아래 버튼을 클릭하여 Scrollama 리더에서 확인하세요.
+            </p>
+            <button id="openReaderBtn" class="btn" disabled>
+                🎬 리더 페이지 열기
+            </button>
+            <div id="readerStatus" class="status"></div>
+        </div>
+
+        <!-- Step 3: 헬스체크 -->
+        <div class="step">
+            <h2>🏥 Step 3: 시스템 상태 확인</h2>
+            <button id="healthCheckBtn" class="btn">
+                ❤️ 헬스체크 실행
+            </button>
+            <div id="healthStatus" class="status"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let generatedData = null;
+
+        // 파일 업로드 및 음악 생성
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const fileInput = document.getElementById('fileInput');
+            const userId = document.getElementById('userId').value;
+            const bookTitle = document.getElementById('bookTitle').value;
+            const page = document.getElementById('page').value;
+            const targetLen = document.getElementById('targetLen').value;
+            const statusDiv = document.getElementById('uploadStatus');
+            const uploadBtn = document.getElementById('uploadBtn');
+
+            if (!fileInput.files[0]) {
+                alert('파일을 선택해주세요');
+                return;
+            }
+
+            // 로딩 시작
+            uploadBtn.disabled = true;
+            statusDiv.className = 'status loading';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<div class="loader"></div> 음악을 생성하고 있습니다... (1-5분 소요)';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                formData.append('user_id', userId);
+                formData.append('book_title', bookTitle);
+                formData.append('page', page);
+                formData.append('target_len', targetLen);
+
+                const response = await fetch(`${API_BASE}/generate/music-v3-long`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    generatedData = data;
+                    statusDiv.className = 'status success';
+                    statusDiv.innerHTML = `
+                        ✅ <strong>음악 생성 완료!</strong><br>
+                        📊 생성된 청크: ${data.chunks}개<br>
+                        📖 책 ID: ${data.book_id}<br>
+                        📄 페이지: ${data.page}<br>
+                        ${data.cached ? '💾 (캐시된 데이터 사용)' : ''}
+                    `;
+
+                    // 리더 버튼 활성화
+                    document.getElementById('openReaderBtn').disabled = false;
+                } else {
+                    throw new Error(data.detail || '음악 생성 실패');
+                }
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = `❌ <strong>오류 발생:</strong><br>${error.message}`;
+            } finally {
+                uploadBtn.disabled = false;
+            }
+        });
+
+        // 리더 페이지 열기
+        document.getElementById('openReaderBtn').addEventListener('click', () => {
+            if (!generatedData) return;
+
+            const userId = document.getElementById('userId').value;
+            const bookTitle = document.getElementById('bookTitle').value;
+            const page = document.getElementById('page').value;
+
+            const readerUrl = `../scrollama/dynamic-reader.html?user_id=${userId}&book_title=${bookTitle}&page=${page}`;
+            window.open(readerUrl, '_blank');
+
+            const statusDiv = document.getElementById('readerStatus');
+            statusDiv.className = 'status info';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '🎬 새 탭에서 리더 페이지가 열렸습니다!';
+        });
+
+        // 헬스체크
+        document.getElementById('healthCheckBtn').addEventListener('click', async () => {
+            const statusDiv = document.getElementById('healthStatus');
+            const btn = document.getElementById('healthCheckBtn');
+
+            btn.disabled = true;
+            statusDiv.className = 'status loading';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<div class="loader"></div> 시스템 상태 확인 중...';
+
+            try {
+                const response = await fetch(`${API_BASE}/generate/health`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    const checks = Object.entries(data.checks)
+                        .map(([name, check]) => {
+                            const emoji = check.status === 'ok' ? '✅' : 
+                                         check.status === 'warning' ? '⚠️' : 
+                                         check.status === 'not_loaded' ? '💤' : '❌';
+                            return `${emoji} <strong>${name}</strong>: ${check.message}`;
+                        })
+                        .join('<br>');
+
+                    statusDiv.className = 'status success';
+                    statusDiv.innerHTML = `
+                        ❤️ <strong>시스템 상태: ${data.status.toUpperCase()}</strong><br>
+                        ⏰ ${data.timestamp}<br><br>
+                        ${checks}
+                    `;
+                } else {
+                    throw new Error('헬스체크 실패');
+                }
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = `❌ <strong>오류:</strong> ${error.message}<br>
+                    FastAPI 서버가 실행 중인지 확인하세요: <code>uvicorn main:app --reload</code>`;
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        // 페이지 로드 시 서버 상태 확인
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch(`${API_BASE}/`);
+                if (response.ok) {
+                    console.log('✅ FastAPI 서버 연결됨');
+                }
+            } catch (error) {
+                alert('⚠️ FastAPI 서버에 연결할 수 없습니다.\n\n서버를 시작하세요:\nuvicorn main:app --reload --port 8000');
+            }
+        });
+    </script>
+</body>
+</html>
+

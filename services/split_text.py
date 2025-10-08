@@ -18,7 +18,7 @@ def ensure_punkt() -> None:
         nltk.download("punkt", download_dir=NLTK_DIR, quiet=True)
         print("NLTK 'punkt' 다운로드 완료.")
 
-ensure_punkt() 
+ensure_punkt()
 
 def split_text_into_processing_segments(text: str) -> Generator[Tuple[str, int], None, None]:
     """

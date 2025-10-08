@@ -14,7 +14,6 @@ from services import (
     chunk_text_by_emotion,
     prompt_service,
     musicgen_service,
-    firestore_service,
 )
 from utils.file_utils import (
     save_text_to_file,
