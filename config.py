@@ -1,4 +1,3 @@
-# pip install pydantic-settings
 from pydantic_settings import BaseSettings
 
 OUTPUT_DIR = "gen_musics"
