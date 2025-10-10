@@ -214,14 +214,10 @@
                     <input type="text" id="bookTitle" required placeholder="예: my_novel">
                 </div>
 
-                <div class="form-group">
-                    <label>📄 페이지 번호</label>
-                    <input type="number" id="page" value="1" min="1" required>
-                </div>
-
-                <div class="form-group">
-                    <label>⏱️ 음악 길이 (초)</label>
-                    <input type="number" id="targetLen" value="240" min="30" step="30">
+                <div class="info-box" style="margin-top: 15px;">
+                    <strong>💡 자동 처리:</strong><br>
+                    • 긴 텍스트는 자동으로 여러 페이지로 분할됩니다 (각 6,000자 단위)<br>
+                    • 음악 길이는 청크 개수에 따라 자동 결정됩니다 (청크당 15초)
                 </div>
 
                 <button type="submit" class="btn" id="uploadBtn">
@@ -265,8 +261,6 @@
             const fileInput = document.getElementById('fileInput');
             const userId = document.getElementById('userId').value;
             const bookTitle = document.getElementById('bookTitle').value;
-            const page = document.getElementById('page').value;
-            const targetLen = document.getElementById('targetLen').value;
             const statusDiv = document.getElementById('uploadStatus');
             const uploadBtn = document.getElementById('uploadBtn');
 
@@ -279,15 +273,13 @@
             uploadBtn.disabled = true;
             statusDiv.className = 'status loading';
             statusDiv.style.display = 'block';
-            statusDiv.innerHTML = '<div class="loader"></div> 음악을 생성하고 있습니다... (1-5분 소요)';
+            statusDiv.innerHTML = '<div class="loader"></div> 음악을 생성하고 있습니다... (자동 페이지 분할 중, 1-10분 소요)';
 
             try {
                 const formData = new FormData();
                 formData.append('file', fileInput.files[0]);
                 formData.append('user_id', userId);
                 formData.append('book_title', bookTitle);
-                formData.append('page', page);
-                formData.append('target_len', targetLen);
 
                 const response = await fetch(`${API_BASE}/generate/music-v3-long`, {
                     method: 'POST',
@@ -299,13 +291,35 @@
                 if (response.ok) {
                     generatedData = data;
                     statusDiv.className = 'status success';
-                    statusDiv.innerHTML = `
-                        ✅ <strong>음악 생성 완료!</strong><br>
-                        📊 생성된 청크: ${data.chunks}개<br>
-                        📖 책 ID: ${data.book_id}<br>
-                        📄 페이지: ${data.page}<br>
-                        ${data.cached ? '💾 (캐시된 데이터 사용)' : ''}
-                    `;
+                    
+                    // 단일 페이지 vs 여러 페이지 응답 처리
+                    if (data.total_pages) {
+                        // 여러 페이지인 경우
+                        const totalDuration = data.pages.reduce((sum, p) => sum + (p.duration || 0), 0);
+                        const pagesInfo = data.pages.map(p => 
+                            `페이지 ${p.page}: ${p.chunks || 0}개 청크, ${p.duration || 0}초 ${p.cached ? '(캐시)' : ''}`
+                        ).join('<br>');
+                        
+                        statusDiv.innerHTML = `
+                            ✅ <strong>음악 생성 완료!</strong><br>
+                            📚 총 ${data.total_pages} 페이지 자동 생성<br>
+                            📄 텍스트 길이: ${data.text_length.toLocaleString()}자<br>
+                            🎵 총 음악 길이: ${totalDuration}초 (${Math.floor(totalDuration/60)}분 ${totalDuration%60}초)<br>
+                            📖 책 ID: ${data.book_id}<br><br>
+                            ${pagesInfo}
+                        `;
+                    } else {
+                        // 단일 페이지인 경우
+                        const duration = data.duration || 0;
+                        statusDiv.innerHTML = `
+                            ✅ <strong>음악 생성 완료!</strong><br>
+                            📊 생성된 청크: ${data.chunks}개<br>
+                            🎵 음악 길이: ${duration}초 (${Math.floor(duration/60)}분 ${duration%60}초)<br>
+                            📖 책 ID: ${data.book_id}<br>
+                            📄 페이지: ${data.page}<br>
+                            ${data.cached ? '💾 (캐시된 데이터 사용)' : ''}
+                        `;
+                    }
 
                     // 리더 버튼 활성화
                     document.getElementById('openReaderBtn').disabled = false;
@@ -326,7 +340,7 @@
 
             const userId = document.getElementById('userId').value;
             const bookTitle = document.getElementById('bookTitle').value;
-            const page = document.getElementById('page').value;
+            const page = generatedData.page || 1;  // 자동 분할 시 첫 페이지부터
 
             const readerUrl = `../scrollama/dynamic-reader.html?user_id=${userId}&book_title=${bookTitle}&page=${page}`;
             window.open(readerUrl, '_blank');
@@ -334,7 +348,16 @@
             const statusDiv = document.getElementById('readerStatus');
             statusDiv.className = 'status info';
             statusDiv.style.display = 'block';
-            statusDiv.innerHTML = '🎬 새 탭에서 리더 페이지가 열렸습니다!';
+            
+            if (generatedData.total_pages > 1) {
+                statusDiv.innerHTML = `
+                    🎬 새 탭에서 리더 페이지가 열렸습니다! (Page 1)<br>
+                    💡 총 ${generatedData.total_pages} 페이지가 생성되었습니다.<br>
+                    다른 페이지를 보려면 URL의 page=1을 변경하세요.
+                `;
+            } else {
+                statusDiv.innerHTML = '🎬 새 탭에서 리더 페이지가 열렸습니다!';
+            }
         });
 
         // 헬스체크

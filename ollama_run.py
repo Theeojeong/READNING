@@ -1,11 +1,10 @@
-# ollama_run.py
 import subprocess, time, os, signal
 
-# ── 1) 환경변수에 GPU 사용 지시 --─────────────
+# 환경변수에 GPU 사용 지시
 env = os.environ.copy()
 env["OLLAMA_ACCEL"] = "gpu"        # "cpu" 로 바꾸면 CPU 강제
 
-# ── 2) 백그라운드로 ollama serve 실행 ────────
+# 백그라운드로 ollama serve 실행
 proc = subprocess.Popen(
     ["ollama", "serve"],
     stdout=subprocess.DEVNULL,     # 로그 버리거나 파일로 리다이렉트

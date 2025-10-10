@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📚 내 서재 - Readning</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .user-info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px 30px;
+            border-radius: 30px;
+            display: inline-block;
+            backdrop-filter: blur(10px);
+        }
+        
+        .books-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        
+        .book-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .book-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+        }
+        
+        .book-title {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .book-author {
+            color: #666;
+            margin-bottom: 15px;
+            font-style: italic;
+        }
+        
+        .book-stats {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-top: 1px solid #e0e0e0;
+            margin-top: 15px;
+        }
+        
+        .stat {
+            text-align: center;
+            flex: 1;
+        }
+        
+        .stat-value {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            font-size: 0.85em;
+            color: #999;
+            margin-top: 3px;
+        }
+        
+        .book-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+        
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 1.5em;
+            padding: 100px 20px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            color: white;
+            padding: 100px 20px;
+        }
+        
+        .empty-state h2 {
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+        
+        .empty-state p {
+            font-size: 1.2em;
+            opacity: 0.8;
+            margin-bottom: 30px;
+        }
+        
+        .upload-btn {
+            background: white;
+            color: #667eea;
+            padding: 15px 30px;
+            border-radius: 30px;
+            border: none;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .upload-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        
+        .search-box {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px 20px;
+            border-radius: 30px;
+            margin: 20px auto;
+            max-width: 600px;
+        }
+        
+        .search-box input {
+            width: 100%;
+            border: none;
+            background: none;
+            font-size: 1.1em;
+            outline: none;
+        }
+        
+        .book-date {
+            font-size: 0.85em;
+            color: #999;
+            margin-top: 10px;
+        }
+        
+        .duration-badge {
+            background: #f0f7ff;
+            color: #667eea;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            display: inline-block;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 내 서재</h1>
+            <div class="user-info">
+                <span id="userId">사용자: 로딩 중...</span>
+            </div>
+        </div>
+        
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="🔍 책 제목 검색...">
+        </div>
+        
+        <div id="content">
+            <div class="loading">📖 책 목록을 불러오는 중...</div>
+        </div>
+    </div>
+
+    <script>
+        // URL 파라미터에서 user_id 가져오기
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('user_id') || 'test_user';
+        
+        document.getElementById('userId').textContent = `사용자: ${userId}`;
+        
+        let allBooks = [];
+        
+        // 책 목록 불러오기
+        async function loadBooks() {
+            try {
+                const response = await fetch(`/api/reader/${userId}`);
+                const data = await response.json();
+                
+                allBooks = data.books;
+                displayBooks(allBooks);
+                
+            } catch (error) {
+                console.error('책 목록 로딩 실패:', error);
+                document.getElementById('content').innerHTML = `
+                    <div class="empty-state">
+                        <h2>❌ 오류 발생</h2>
+                        <p>책 목록을 불러올 수 없습니다.</p>
+                        <button class="upload-btn" onclick="location.reload()">
+                            🔄 다시 시도
+                        </button>
+                    </div>
+                `;
+            }
+        }
+        
+        // 책 목록 표시
+        function displayBooks(books) {
+            const content = document.getElementById('content');
+            
+            if (!books || books.length === 0) {
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <h2>📚 아직 업로드한 책이 없습니다</h2>
+                        <p>첫 번째 책을 업로드해보세요!</p>
+                        <button class="upload-btn" onclick="goToUpload()">
+                            ➕ 새 책 업로드
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            
+            const booksHtml = books.map(book => {
+                const duration = book.totalDuration ? formatDuration(book.totalDuration) : '0분';
+                const bookTitle = book.title.replace(/_/g, ' ');
+                const bookId = book.bookId.split('_').slice(1).join('_'); // user_id 제거
+                
+                return `
+                    <div class="book-card">
+                        <div class="book-title">${bookTitle}</div>
+                        ${book.author ? `<div class="book-author">저자: ${book.author}</div>` : ''}
+                        
+                        <div class="book-stats">
+                            <div class="stat">
+                                <div class="stat-value">${book.totalPages}</div>
+                                <div class="stat-label">페이지</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">${book.totalChunks}</div>
+                                <div class="stat-label">청크</div>
+                            </div>
+                        </div>
+                        
+                        <div class="duration-badge">🎵 총 ${duration}</div>
+                        
+                        ${book.updatedAt ? `
+                            <div class="book-date">
+                                📅 ${new Date(book.updatedAt).toLocaleDateString('ko-KR')}
+                            </div>
+                        ` : ''}
+                        
+                        <div class="book-actions">
+                            ${book.totalPages > 0 ? `
+                                <button class="btn btn-primary" onclick="openReader('${bookId}', 1)">
+                                    📖 읽기
+                                </button>
+                            ` : ''}
+                            <button class="btn btn-secondary" onclick="viewDetails('${bookId}')">
+                                📋 상세
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            content.innerHTML = `
+                <div class="books-grid">
+                    ${booksHtml}
+                </div>
+            `;
+        }
+        
+        // 시간 포맷팅
+        function formatDuration(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            const remainingMinutes = minutes % 60;
+            
+            if (hours > 0) {
+                return `${hours}시간 ${remainingMinutes}분`;
+            } else {
+                return `${minutes}분`;
+            }
+        }
+        
+        // Reader 열기
+        function openReader(bookTitle, page = 1) {
+            const url = `/scrollama/dynamic-reader.html?user_id=${userId}&book_title=${bookTitle}&page=${page}`;
+            window.open(url, '_blank');
+        }
+        
+        // 상세 보기
+        async function viewDetails(bookTitle) {
+            try {
+                const response = await fetch(`/api/reader/${userId}/${bookTitle}`);
+                const data = await response.json();
+                
+                let chaptersInfo = '';
+                if (data.chapters && data.chapters.length > 0) {
+                    chaptersInfo = data.chapters.map(ch => 
+                        `페이지 ${ch.page}: ${ch.chunkCount}개 청크 (${formatDuration(ch.totalDuration)})`
+                    ).join('\n');
+                } else {
+                    chaptersInfo = '생성된 챕터가 없습니다.';
+                }
+                
+                alert(`📖 ${bookTitle}\n\n${chaptersInfo}`);
+                
+            } catch (error) {
+                alert('챕터 정보를 불러올 수 없습니다.');
+            }
+        }
+        
+        // 업로드 페이지로 이동
+        function goToUpload() {
+            window.location.href = `/static/upload-and-test.html?user_id=${userId}`;
+        }
+        
+        // 검색 기능
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            
+            if (!searchTerm) {
+                displayBooks(allBooks);
+                return;
+            }
+            
+            const filtered = allBooks.filter(book => 
+                book.title.toLowerCase().includes(searchTerm) ||
+                (book.author && book.author.toLowerCase().includes(searchTerm))
+            );
+            
+            displayBooks(filtered);
+        });
+        
+        // 페이지 로드 시 실행
+        loadBooks();
+    </script>
+</body>
+</html>

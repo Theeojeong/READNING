@@ -111,7 +111,6 @@ def split_txt_into_pages(text_or_path: str) -> List[str]:
     return pages
 
 def _deduplicate_chapter_titles(chapters: List[dict]) -> List[dict]:
-    """Ensure chapter titles are unique by appending numeric suffixes."""
 
     counts: dict[str, int] = {}
     for ch in chapters:

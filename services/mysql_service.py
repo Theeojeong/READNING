@@ -238,6 +238,62 @@ class MySQLService:
             session.close()
 
     @staticmethod
+    def get_user_books(user_id: str) -> List[Dict[str, Any]]:
+        """
+        사용자가 업로드한 모든 책 목록 조회
+        
+        Args:
+            user_id: 사용자 ID
+        
+        Returns:
+            사용자의 책 목록 (각 책의 페이지 수, 총 청크 수 포함)
+        """
+        session = SessionLocal()
+        try:
+            books = session.execute(
+                text("""
+                    SELECT 
+                        b.id,
+                        b.title,
+                        b.author,
+                        b.created_at,
+                        b.updated_at,
+                        COUNT(DISTINCT c.page) as total_pages,
+                        COUNT(DISTINCT ch.id) as total_chunks,
+                        SUM(c.total_duration) as total_duration
+                    FROM books b
+                    LEFT JOIN chapters c ON b.id = c.book_id
+                    LEFT JOIN chunks ch ON c.id = ch.chapter_id
+                    WHERE b.user_id = :user_id
+                    GROUP BY b.id, b.title, b.author, b.created_at, b.updated_at
+                    ORDER BY b.updated_at DESC
+                """),
+                {"user_id": user_id}
+            ).fetchall()
+
+            print(f"[MySQL] 📚 {user_id} 사용자의 책 {len(books)}권 조회")
+
+            return [
+                {
+                    "bookId": row[0],
+                    "title": row[1],
+                    "author": row[2],
+                    "createdAt": row[3].isoformat() if row[3] else None,
+                    "updatedAt": row[4].isoformat() if row[4] else None,
+                    "totalPages": row[5] or 0,
+                    "totalChunks": row[6] or 0,
+                    "totalDuration": float(row[7]) if row[7] else 0,
+                }
+                for row in books
+            ]
+
+        except Exception as e:
+            print(f"[MySQL] ❌ 사용자 책 목록 조회 실패: {e}")
+            return []
+        finally:
+            session.close()
+
+    @staticmethod
     def health_check() -> bool:
         """데이터베이스 연결 상태 확인"""
         try:

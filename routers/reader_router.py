@@ -19,6 +19,41 @@ async def health_check():
         raise HTTPException(503, "데이터베이스 연결 실패")
 
 
+@router.get("/{user_id}")
+async def get_user_books(user_id: str):
+    """
+    사용자가 업로드한 모든 책 목록 조회
+    
+    Args:
+        user_id: 사용자 ID
+    
+    Returns:
+        {
+            "userId": "user123",
+            "books": [
+                {
+                    "bookId": "user123_book1",
+                    "title": "Book 1",
+                    "author": "Author 1", 
+                    "totalPages": 5,
+                    "totalChunks": 15,
+                    "totalDuration": 225.0,
+                    "createdAt": "2024-01-01T10:00:00",
+                    "updatedAt": "2024-01-01T10:00:00"
+                },
+                ...
+            ]
+        }
+    """
+    books = mysql_service.get_user_books(user_id)
+    
+    return {
+        "userId": user_id,
+        "totalBooks": len(books),
+        "books": books
+    }
+
+
 @router.get("/{user_id}/{book_title}/{page}")
 async def get_chapter_data(user_id: str, book_title: str, page: int):
     """

@@ -38,23 +38,13 @@ CREATE TABLE IF NOT EXISTS chunks (
     chunk_index INT NOT NULL,
     text_content TEXT NOT NULL,
     text_preview VARCHAR(500),
-    emotion VARCHAR(100),
+    emotion TEXT,
     audio_url TEXT,
     audio_duration FLOAT DEFAULT 30.0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE,
     INDEX idx_chapter (chapter_id),
-    INDEX idx_chunk_order (chapter_id, chunk_index),
-    INDEX idx_emotion (emotion)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- 사용자 음악 취향 테이블 (선택사항)
-CREATE TABLE IF NOT EXISTS user_preferences (
-    user_id VARCHAR(255) PRIMARY KEY,
-    music_style VARCHAR(100),
-    preferences JSON,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    INDEX idx_chunk_order (chapter_id, chunk_index)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 샘플 데이터 삽입 (테스트용)

@@ -3,7 +3,7 @@ from fastapi.responses import FileResponse
 from starlette.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware # 프론트와 연결 위한 CORS설정 
 from routers import musicgen_upload_router, reader_router
-from config import OUTPUT_DIR, FINAL_MIX_NAME
+from config import OUTPUT_DIR
 from utils.file_utils import secure_filename
 from pathlib import Path
 import os
