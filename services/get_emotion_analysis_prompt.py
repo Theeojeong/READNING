@@ -17,7 +17,7 @@ You are assisting an audio-engine pipeline that adds background music to a story
 Your task is to detect emotionally meaningful turning points so the music can change
 exactly when the reader's feelings shift.
 
-⚠️  Output MUST be a single valid JSON object (NO markdown), or:
+Output MUST be a single valid JSON object (NO markdown), or:
      {{"emotional_phases":[]}} if you cannot comply.
 
 For each turning point include:
@@ -27,7 +27,7 @@ For each turning point include:
 - significance     : 1 (low) to 5 (high) — how strongly the reader’s emotion changes
 - explanation      : 1 short sentence (≤ 25 words) why this moment matters musically
 
-TEXT SEGMENT (max 2600 chars):
+TEXT SEGMENT:
 {segment}
 
 Return exactly ONE JSON in this schema:
@@ -37,9 +37,9 @@ Return exactly ONE JSON in this schema:
       "start_text":"",
       "emotions_before":"",
       "emotions_after":"",
-      "significance":0,
+      "significance":"",
       "explanation":""
     }}
   ]
 }}
-""".strip()
+"""

@@ -1,6 +1,5 @@
 from pydantic_settings import BaseSettings
 
-OUTPUT_DIR = "gen_musics"
 GEN_DURATION = 15  # MusicGen 각 청크 음악 생성 길이 (초)
 
 # 고정 상수

@@ -97,17 +97,17 @@ def chunk_by_sentences(text, n=300):
     return chunks
 
 
-def split_txt_into_pages(text_or_path: str) -> List[str]:
+def split_txt_into_pages(text: str) -> List[str]:
 
-    if os.path.exists(text_or_path):
-        with open(text_or_path, "r", encoding="utf-8") as f:
+    if os.path.exists(text):
+        with open(text, "r", encoding="utf-8") as f:
             text = f.read()
     else:
-        text = text_or_path
+        text = text
 
-    pages: List[str] = []
-    for seg, _ in split_text_into_processing_segments(text):
-        pages.append(seg)
+    pages = []
+    for chunk, _ in split_text_into_processing_segments(text):
+        pages.append(chunk)
     return pages
 
 def _deduplicate_chapter_titles(chapters: List[dict]) -> List[dict]:
