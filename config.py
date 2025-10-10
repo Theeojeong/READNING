@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 
 GEN_DURATION = 15  # MusicGen 각 청크 음악 생성 길이 (초)
+OUTPUT_DIR = "gen_musics"
 
 # 고정 상수
 MAX_SEGMENT_SIZE   = 6000   # LLM 1회 처리 최대 글자수

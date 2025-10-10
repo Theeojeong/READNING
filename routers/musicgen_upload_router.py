@@ -15,11 +15,10 @@ from services import (
     musicgen_service,
 )
 from utils.file_utils import secure_filename
-from config import GEN_DURATION
+from config import GEN_DURATION, OUTPUT_DIR
 
-OUTPUT_DIR = "gen_musics"
 
-router = APIRouter(prefix="/generate", tags=["UploadWorkflow"])
+router = APIRouter(prefix="/generate")
 
 @router.post("/music")
 async def generate_music_long(file: UploadFile = File(), user_name: str = Form(), book_title: str = Form()):
@@ -30,16 +29,16 @@ async def generate_music_long(file: UploadFile = File(), user_name: str = Form()
     # 디렉토리 설정
     book_dir = f"{user_name}/{book_title}"
     abs_bookdir = os.path.join(OUTPUT_DIR, book_dir)
+
     if not os.path.exists(abs_bookdir):
         os.makedirs(abs_bookdir)
 
     # 텍스트 읽기 및 자동 페이지 분할
     text = file.file.read().decode("utf-8")
 
-
     print(f"텍스트 길이: {len(text)}자")
 
-    # 자동 페이지 분할
+    # 페이지 분할
     pages = split_txt_into_pages(text)
     total_pages = len(pages)
     print(f"총 {total_pages} 페이지로 자동 분할")
@@ -71,17 +70,17 @@ async def generate_music_long(file: UploadFile = File(), user_name: str = Form()
 
             # 3) MusicGen 음악 생성
             global_prompt = prompt_service.generate_global(page_text)
-            rp = []
+            regional_prompt = []
             for chunk in chunks:
                 ctxt = chunk[0] if isinstance(chunk, (list, tuple)) else chunk
                 regional = prompt_service.generate_regional(ctxt)
-                rp.append(
+                regional_prompt.append(
                     prompt_service.compose_musicgen_prompt(global_prompt, f"{regional}")
                 )
 
             musicgen_service.generate_music_samples(
                 global_prompt=global_prompt,
-                regional_prompts=rp,
+                regional_prompts=regional_prompt,
                 book_id_dir=f"{book_dir}/page{page_num}",
             )
 
@@ -134,7 +133,6 @@ async def generate_music_long(file: UploadFile = File(), user_name: str = Form()
 
     # 5) 응답
     if total_pages == 1:
-        # 단일 페이지인 경우 간단한 응답
         return {
             "message": f"{book_title} 음원 생성 완료",
             "page": 1,
@@ -144,7 +142,6 @@ async def generate_music_long(file: UploadFile = File(), user_name: str = Form()
             "cached": page_results[0].get("cached", False),
         }
     else:
-        # 여러 페이지인 경우 상세 응답
         return {
             "message": f"{book_title} 총 {total_pages} 페이지 처리 완료",
             "book_id": book_id,
@@ -152,24 +149,6 @@ async def generate_music_long(file: UploadFile = File(), user_name: str = Form()
             "text_length": len(text),
             "pages": page_results,
         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 @router.get("/health")

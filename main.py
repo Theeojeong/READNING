@@ -47,12 +47,3 @@ def download_music(user_id: str, book_title: str, page: int):
         filename=f"ch{page}.wav",
         headers={"Content-Disposition": f'inline; filename="ch{page}.wav"'}
     )
-
-# ② 레거시 구조: /gen_musics/<book_title>/ch{page}.wav
-# ───────────────────────────────────────────────────────────────
-@app.get("/gen_musics/{book_title}/ch{page}.wav", include_in_schema=False)
-def legacy_download(book_title: str, page: int):
-    path = Path(OUTPUT_DIR) / book_title / f"ch{page}.wav"
-    if not path.exists():
-        raise HTTPException(404, "file not found (legacy)")
-    return FileResponse(path, media_type="audio/wav")
