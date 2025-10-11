@@ -278,10 +278,10 @@
             try {
                 const formData = new FormData();
                 formData.append('file', fileInput.files[0]);
-                formData.append('user_id', userId);
+                formData.append('user_name', userId);
                 formData.append('book_title', bookTitle);
 
-                const response = await fetch(`${API_BASE}/generate/music-v3-long`, {
+                const response = await fetch(`${API_BASE}/generate/music`, {
                     method: 'POST',
                     body: formData
                 });

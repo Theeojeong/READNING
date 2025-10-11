@@ -1,4 +1,4 @@
-import ollama
+from services.model_manager import ollama_manager
 
 def generate_global(text_chunk):
     prompt = f"""
@@ -20,7 +20,7 @@ Text:
 
 Now write only the two lines: scene summary and global music theme.
 """
-    response = ollama.chat(model="gemma3:4b", messages=[{"role": "user", "content": prompt}])
+    response = ollama_manager.chat([{"role": "user", "content": prompt}])
     return response["message"]["content"]
 
 def generate_regional(text_chunk):
@@ -50,7 +50,7 @@ Text:
 
 Only return the prompt in the compact format shown above. Avoid full sentences or extra text.
 """
-    response = ollama.chat(model="gemma3:4b", messages=[{"role": "user", "content": prompt}])
+    response = ollama_manager.chat([{"role": "user", "content": prompt}])
     return response["message"]["content"]
 
 def compose_musicgen_prompt(global_theme_output: str, regional_prompt_output: str) -> str:

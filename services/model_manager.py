@@ -1,5 +1,5 @@
 """모델 관리자 - 싱글톤 패턴으로 모델 재사용"""
-import ollama
+from langchain_ollama import ChatOllama
 from audiocraft.models import MusicGen
 from typing import Optional
 from utils.logger import log
@@ -7,30 +7,57 @@ from config import MODEL_NAME, GEN_DURATION
 
 
 class OllamaManager:
-    """Ollama 연결 관리 싱글톤"""
+    """Ollama 연결 관리 싱글톤 (langchain_ollama 사용)"""
     _instance: Optional['OllamaManager'] = None
-    _client: Optional[object] = None
+    _llm: Optional[ChatOllama] = None
     
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
     
-    def get_client(self):
-        """올라마 클라이언트 반환 (연결 재사용)"""
-        if self._client is None:
+    def get_llm(self) -> ChatOllama:
+        """Langchain Ollama LLM 반환 (연결 재사용)"""
+        if self._llm is None:
             try:
-                self._client = ollama
-                log("Ollama 클라이언트 초기화 완료")
+                self._llm = ChatOllama(
+                    model=MODEL_NAME,
+                    temperature=0.7,
+                    num_ctx=4096,  # 컨텍스트 길이
+                    timeout=120.0,  # 타임아웃 설정
+                )
+                log("Langchain Ollama LLM 초기화 완료")
             except Exception as e:
-                log(f"Ollama 클라이언트 초기화 실패: {e}")
+                log(f"Langchain Ollama LLM 초기화 실패: {e}")
                 raise
-        return self._client
+        return self._llm
     
     def chat(self, messages: list) -> dict:
-        """채팅 요청 (재시도 로직 포함)"""
-        client = self.get_client()
-        return client.chat(model=MODEL_NAME, messages=messages)
+        """채팅 요청 (langchain_ollama 사용)"""
+        llm = self.get_llm()
+        try:
+            # langchain_ollama는 메시지 리스트를 직접 받음
+            response = llm.invoke(messages)
+            return {
+                "message": {
+                    "content": response.content
+                }
+            }
+        except Exception as e:
+            log(f"LLM 채팅 요청 실패: {e}")
+            raise
+    
+    def chat_with_structured_output(self, messages: list, response_schema) -> dict:
+        """Structured Output을 사용한 채팅 요청"""
+        llm = self.get_llm()
+        try:
+            # Pydantic 모델을 사용한 structured output
+            structured_llm = llm.with_structured_output(response_schema)
+            response = structured_llm.invoke(messages)
+            return response
+        except Exception as e:
+            log(f"Structured Output LLM 요청 실패: {e}")
+            raise
 
 
 class MusicGenManager:

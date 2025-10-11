@@ -1,7 +1,7 @@
 import nltk, os
 from pprint import pprint
 from config import MAX_SEGMENT_SIZE, OVERLAP_SIZE
-from typing import Generator, Tuple
+from typing import Generator, Tuple, List
 from nltk.tokenize import sent_tokenize
 from utils.logger import log
 
@@ -65,7 +65,9 @@ def _find_sentence_boundary(
 
 
 def split_text_into_processing_segments(text: str) -> Generator[Tuple[str, int], None, None]:
-
+    """
+    텍스트를 처리 가능한 세그먼트로 분할 (슬라이딩 윈도우 적용)
+    """
     total_length = len(text)
     
     # 1단계: 짧은 텍스트는 분할 불필요
@@ -103,3 +105,40 @@ def split_text_into_processing_segments(text: str) -> Generator[Tuple[str, int],
         current_pos = max(current_pos + 1, next_pos)
     
     log("텍스트 분할 완료")
+
+
+def split_text_with_sliding_window(text: str, max_size: int = 6000, overlap: int = 600) -> List[str]:
+    """
+    🚀 슬라이딩 윈도우 방식으로 텍스트 분할
+    페이지 경계에서 중요한 감정 전환점을 놓치지 않음
+    
+    Args:
+        text: 분할할 텍스트
+        max_size: 최대 페이지 크기 (기본 6000자)
+        overlap: 오버랩 크기 (기본 600자)
+    
+    Returns:
+        분할된 페이지 리스트
+    """
+    if len(text) <= max_size:
+        return [text]
+    
+    pages = []
+    pos = 0
+    
+    while pos < len(text):
+        # 기본 페이지 크기
+        end = min(pos + max_size, len(text))
+        
+        if end < len(text):
+            # 다음 페이지 시작 부분 미리보기 (오버랩)
+            page_text = text[pos:end + overlap]
+        else:
+            # 마지막 페이지
+            page_text = text[pos:end]
+        
+        pages.append(page_text)
+        pos = end  # 오버랩 제외하고 다음 시작점으로 이동
+    
+    print(f"📖 슬라이딩 윈도우 분할: {len(pages)}개 페이지 (오버랩: {overlap}자)")
+    return pages

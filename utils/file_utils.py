@@ -1,4 +1,5 @@
 import re
+import os
 
 def secure_filename(book_title: str) -> str:
     """파일 시스템에서 금지된 문자만 제거"""
@@ -11,3 +12,8 @@ def secure_filename(book_title: str) -> str:
     if not book_title:
         raise ValueError("책 제목이 비어있거나 유효하지 않습니다")
     return book_title
+
+def ensure_dir(directory: str) -> None:
+    """디렉토리가 존재하지 않으면 생성"""
+    if not os.path.exists(directory):
+        os.makedirs(directory, exist_ok=True)

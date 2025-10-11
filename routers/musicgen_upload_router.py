@@ -1,4 +1,5 @@
 import os
+from typing import List, Dict, Any
 from fastapi import (
     APIRouter,
     UploadFile,
@@ -8,147 +9,186 @@ from fastapi import (
 )
 from services.model_manager import musicgen_manager
 from services.mysql_service import mysql_service
-from services.ebooks2text import split_txt_into_pages
-from services import (
-    chunk_text_by_emotion,
-    prompt_service,
-    musicgen_service,
-)
+from services import prompt_service
+from services.async_emotion_analysis import process_book_with_async_emotion_detection
+from services.async_music_generation import process_all_chunks_async
+from services.langgraph_workflow import music_workflow
 from utils.file_utils import secure_filename
+from utils.logger import log
 from config import GEN_DURATION, OUTPUT_DIR
 
 
 router = APIRouter(prefix="/generate")
 
+
 @router.post("/music")
-async def generate_music_long(file: UploadFile = File(), user_name: str = Form(), book_title: str = Form()):
+async def generate_music_optimized(
+    file: UploadFile = File(), 
+    user_name: str = Form(), 
+    book_title: str = Form()
+):
 
     book_title = secure_filename(book_title)
     book_id = f"{user_name}_{book_title}"
-
+    
     # 디렉토리 설정
     book_dir = f"{user_name}/{book_title}"
     abs_bookdir = os.path.join(OUTPUT_DIR, book_dir)
-
+    
     if not os.path.exists(abs_bookdir):
         os.makedirs(abs_bookdir)
-
-    # 텍스트 읽기 및 자동 페이지 분할
+    
+    # 텍스트 읽기
     text = file.file.read().decode("utf-8")
-
-    print(f"텍스트 길이: {len(text)}자")
-
-    # 페이지 분할
-    pages = split_txt_into_pages(text)
-    total_pages = len(pages)
-    print(f"총 {total_pages} 페이지로 자동 분할")
-
+    text_length = len(text)
+    print(f"📄 텍스트 길이: {text_length:,}자")
+    
+    # 글로벌 프롬프트 생성 (전체 텍스트 기반)
+    global_prompt = prompt_service.generate_global(text)
+    
+    # 비동기 감정 분석 워크플로우 실행
+    log("🎭 비동기 감정 분석 워크플로우 시작")
+    all_chunks = await process_book_with_async_emotion_detection(text)
+    
+    total_chunks = len(all_chunks)
+    log(f"🎭 비동기 감정 분석 완료: 총 {total_chunks}개 청크 생성")
+    
+    # 페이지별 청크 매핑 생성 (한 페이지당 4개 청크 고정)
+    page_chunk_mapping = {}
+    CHUNKS_PER_PAGE = 4  # 한 페이지당 청크 수 고정
+    
+    for i, chunk in enumerate(all_chunks):
+        page_num = (i // CHUNKS_PER_PAGE) + 1
+        if page_num not in page_chunk_mapping:
+            page_chunk_mapping[page_num] = {
+                "start_index": i + 1,
+                "end_index": i + 1,
+                "chunk_count": 0
+            }
+        page_chunk_mapping[page_num]["end_index"] = i + 1
+        page_chunk_mapping[page_num]["chunk_count"] += 1
+        chunk["page"] = page_num
+    
+    log(f"📄 페이지 구성: 총 {len(page_chunk_mapping)}페이지, 페이지당 {CHUNKS_PER_PAGE}개 청크")
+    
+    # 모든 청크를 비동기 병렬 처리
+    print(f"🎵 {total_chunks}개 청크 음악 생성 시작...")
+    chunk_metadata = await process_all_chunks_async(all_chunks, book_dir, global_prompt)
+    
+    # 페이지별로 청크 그룹화 및 저장
     page_results = []
-
-    # 각 페이지별 처리
-    for page_num, page_text in enumerate(pages, 1):
-        print(f"페이지 {page_num}/{total_pages} 처리 중...")
-
-        # 이미 생성된 데이터 확인
-        existing_data = mysql_service.get_chapter_chunks(book_id, page_num)
-
-        if existing_data and len(existing_data.get("chunks", [])) > 0:
-            print(f"페이지 {page_num} 캐시 사용")
-            page_results.append(
-                {
-                    "page": page_num,
-                    "chunks": len(existing_data["chunks"]),
-                    "cached": True,
-                }
-            )
+    
+    for page_num, mapping in page_chunk_mapping.items():
+        start_idx = mapping["start_index"] - 1  # 0-based index
+        end_idx = mapping["end_index"]
+        
+        # 해당 페이지의 청크들만 추출
+        page_chunks = chunk_metadata[start_idx:end_idx]
+        
+        if not page_chunks:
+            page_results.append({
+                "page": page_num,
+                "chunks": 0,
+                "duration": 0,
+                "error": "청크 생성 실패"
+            })
             continue
-
+        
+        # 페이지별 음악 길이 계산
+        page_duration = len(page_chunks) * GEN_DURATION
+        
+        # MySQL에 저장
         try:
-            # 2) 청크 분할
-            chunks = chunk_text_by_emotion.chunk_text_by_emotion(page_text)
-            print(f"✂️ 청크 {len(chunks)}개 생성")
-
-            # 3) MusicGen 음악 생성
-            global_prompt = prompt_service.generate_global(page_text)
-            regional_prompt = []
-            for chunk in chunks:
-                ctxt = chunk[0] if isinstance(chunk, (list, tuple)) else chunk
-                regional = prompt_service.generate_regional(ctxt)
-                regional_prompt.append(
-                    prompt_service.compose_musicgen_prompt(global_prompt, f"{regional}")
-                )
-
-            musicgen_service.generate_music_samples(
-                global_prompt=global_prompt,
-                regional_prompts=regional_prompt,
-                book_id_dir=f"{book_dir}/page{page_num}",
-            )
-
-            # 4) MySQL 메타데이터 저장
-            chunk_metadata = []
-            for idx, chunk in enumerate(chunks):
-                chunk_text = chunk[0] if isinstance(chunk, (list, tuple)) else chunk
-                chunk_context = (
-                    chunk[1]
-                    if isinstance(chunk, (list, tuple)) and len(chunk) > 1
-                    else {}
-                )
-
-                chunk_metadata.append(
-                    {
-                        "index": idx + 1,
-                        "text": chunk_text[:500],
-                        "fullText": chunk_text,
-                        "emotion": chunk_context.get("emotions", "unknown"),
-                        "audioUrl": f"/{OUTPUT_DIR}/{book_dir}/page{page_num}/chunk_{idx+1}.wav",
-                        "duration": GEN_DURATION,  # 초 단위 (15초)
-                    }
-                )
-
-            # 실제 음악 총 길이 계산
-            actual_duration = len(chunks) * GEN_DURATION
-
             mysql_service.save_chapter_chunks(
                 book_id=book_id,
                 page=page_num,
-                chunks=chunk_metadata,
-                total_duration=actual_duration,  # 실제 계산된 길이
+                chunks=page_chunks,
+                total_duration=page_duration,
                 book_title=book_title,
             )
-
-            page_results.append(
-                {
-                    "page": page_num,
-                    "chunks": len(chunks),
-                    "duration": actual_duration,  # 실제 음악 길이 (초)
-                    "cached": False,
-                }
-            )
-
-            print(f"✅ 페이지 {page_num} 완료")
-
+            
+            page_results.append({
+                "page": page_num,
+                "chunks": len(page_chunks),
+                "duration": page_duration,
+                "cached": False
+            })
+            
+            print(f"✅ 페이지 {page_num} 저장 완료: {len(page_chunks)}개 청크, {page_duration}초")
+            
         except Exception as e:
-            print(f"❌ 페이지 {page_num} 실패: {e}")
-            page_results.append({"page": page_num, "error": str(e), "cached": False})
+            print(f"❌ 페이지 {page_num} 저장 실패: {e}")
+            page_results.append({
+                "page": page_num,
+                "error": str(e),
+                "cached": False
+            })
+    
+    # 응답
+    total_duration = sum(page.get("duration", 0) for page in page_results)
+    successful_pages = len([p for p in page_results if "error" not in p])
+    
+    return {
+        "message": f"{book_title} 음악 생성 완료",
+        "book_id": book_id,
+        "text_length": text_length,
+        "total_pages": len(page_chunk_mapping),
+        "total_chunks": total_chunks,
+        "total_duration": total_duration,
+        "successful_pages": successful_pages,
+        "pages": page_results,
+        "processing_method": "async_emotion_detection_parallel",
+        "performance_optimizations": {
+            "max_concurrent_emotion_analysis": 8,
+            "max_concurrent_music_generation": 4,
+            "emotion_analysis_timeout": 45.0
+        }
+    }
 
-    # 5) 응답
-    if total_pages == 1:
-        return {
-            "message": f"{book_title} 음원 생성 완료",
-            "page": 1,
-            "chunks": page_results[0].get("chunks", 0),
-            "duration": page_results[0].get("duration", 0),  # 실제 음악 길이
-            "book_id": book_id,
-            "cached": page_results[0].get("cached", False),
-        }
-    else:
-        return {
-            "message": f"{book_title} 총 {total_pages} 페이지 처리 완료",
-            "book_id": book_id,
-            "total_pages": total_pages,
-            "text_length": len(text),
-            "pages": page_results,
-        }
+
+
+@router.post("/music-langgraph")
+async def generate_music_with_langgraph(
+    file: UploadFile = File(), 
+    user_name: str = Form(), 
+    book_title: str = Form()
+):
+    """
+    🚀 LangGraph 기반 음악 생성 워크플로우:
+    1. 텍스트 분리 → 2. 감정 분석 → 3. 청크 생성 → 4. 음악 생성 → 5. DB 저장
+    모든 단계가 그래프로 관리되어 시각화 및 디버깅이 용이함
+    """
+    
+    book_title = secure_filename(book_title)
+    book_id = f"{user_name}_{book_title}"
+    
+    # 디렉토리 설정
+    book_dir = f"{user_name}/{book_title}"
+    abs_bookdir = os.path.join(OUTPUT_DIR, book_dir)
+    
+    if not os.path.exists(abs_bookdir):
+        os.makedirs(abs_bookdir)
+    
+    # 텍스트 읽기
+    text = file.file.read().decode("utf-8")
+    text_length = len(text)
+    log(f"📄 LangGraph: 텍스트 길이 {text_length:,}자")
+    
+    # LangGraph 워크플로우 실행
+    result = await music_workflow.run_workflow(
+        text=text,
+        user_name=user_name,
+        book_title=book_title,
+        book_id=book_id,
+        book_dir=book_dir
+    )
+    
+    return result
+
+
+
+
+
 
 
 @router.get("/health")
