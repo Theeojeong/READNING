@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Theeojeong", email = "wogusto13@gmail.com" }
 ]
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.11,<3.13"
 
 dependencies = [
     # Web Framework
@@ -14,15 +14,16 @@ dependencies = [
     "uvicorn[standard]>=0.35.0,<0.36.0",
     "pydantic-settings>=2.10.1,<3.0.0",
     "python-multipart>=0.0.20,<0.1.0",
-    # PyTorch (audiocraft 호환성을 위해 2.1.0 고정)
-    "torch==2.1.0",
-    "torchaudio==2.1.0",
-    "torchvision==0.16.0",
+    # PyTorch
+    "torch>=2.1.0",
+    "torchaudio>=2.1.0",
+    "torchvision>=0.16.0",
     "numpy==1.26.3",
     "transformers==4.41.2",
     # Audio Processing
     "audiocraft",
     "pydub>=0.25.1,<0.26.0",
+    "soundfile>=0.12.1,<0.13.0",
     # Text Processing
     "nltk>=3.9.1,<4.0.0",
     "beautifulsoup4>=4.12.3,<5.0.0",

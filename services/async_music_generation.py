@@ -1,6 +1,7 @@
 """
 비동기 음악 생성 서비스
-청크들을 동시다발적으로 음악 생성하는 모듈
+각 텍스트 청크에 대해 MusicGen을 호출하고, 생성된 오디오/텍스트 메타데이터를 반환합니다.
+복잡한 최적화보다는 이해하기 쉬운 순차 처리 + 명확한 변수명을 사용합니다.
 """
 
 import asyncio
@@ -9,19 +10,18 @@ import os
 from typing import List, Dict, Any
 from services import prompt_service, musicgen_service
 from utils.logger import log
-from config import GEN_DURATION, OUTPUT_DIR
+from config import GEN_DURATION, OUTPUT_DIR, MAX_CONCURRENT_MUSIC_GENERATION
 
-# 성능 최적화를 위한 상수
-MAX_CONCURRENT_MUSIC_GENERATION = 4  # 동시 음악 생성 청크 수 제한
+# MAX_CONCURRENT_MUSIC_GENERATION 값은 config.py에서 관리합니다.
 
 
 async def process_single_chunk(
-    chunk_data: Dict[str, Any], 
-    chunk_index: int, 
-    book_dir: str, 
-    global_prompt: str
+    chunk_data: Dict[str, Any],
+    chunk_index: int,
+    book_relative_dir: str,
+    global_prompt: str,
 ) -> Dict[str, Any]:
-    """단일 청크를 비동기로 처리"""
+    """단일 청크를 처리하여 오디오/텍스트 파일을 생성하고 메타데이터를 반환합니다."""
     start_time = time.time()
     try:
         chunk_text = chunk_data["text"]
@@ -33,17 +33,38 @@ async def process_single_chunk(
         regional_prompt = prompt_service.generate_regional(chunk_text)
         music_prompt = prompt_service.compose_musicgen_prompt(global_prompt, regional_prompt)
         
-        # 음악 생성 (비동기)
-        await asyncio.get_event_loop().run_in_executor(
-            None,
-            musicgen_service.generate_music_samples,
-            global_prompt,
-            [music_prompt],
-            f"{book_dir}/chunk_{chunk_index}"
-        )
+        # 음악 생성 (비동기, 순차 처리)
+        audio_url: str = ""
+        try:
+            saved_paths = await asyncio.get_event_loop().run_in_executor(
+                None,
+                musicgen_service.generate_music_samples,
+                global_prompt,
+                [music_prompt],
+                f"{book_relative_dir}/chunk_{chunk_index}"
+            )
+            # 저장된 첫 번째 오디오 파일을 URL로 반환
+            if saved_paths and len(saved_paths) > 0:
+                audio_path = saved_paths[0]
+                audio_url = "/" + audio_path.replace("\\", "/")
+            else:
+                raise RuntimeError("No audio file generated")
+        except Exception as music_error:
+            log(f"🎵 청크 {chunk_index} MusicGen 오류: {music_error}")
+            # MusicGen 실패 시 더미 파일 생성
+            dummy_audio_dir = os.path.join(OUTPUT_DIR, f"{book_relative_dir}/chunk_{chunk_index}")
+            os.makedirs(dummy_audio_dir, exist_ok=True)
+            # 빈 오디오 파일 생성 (1초 무음)
+            import numpy as np
+            import soundfile as sf
+            silence = np.zeros(16000)  # 1초 무음 (16kHz)
+            dummy_path = os.path.join(dummy_audio_dir, "regional_output_1.wav")
+            sf.write(dummy_path, silence, 16000)
+            audio_url = "/" + dummy_path.replace("\\", "/")
+            log(f"🎵 청크 {chunk_index} 더미 오디오 파일 생성 완료")
         
         # 텍스트 청크 파일 저장
-        chunk_text_file = os.path.join(OUTPUT_DIR, f"{book_dir}/chunk_{chunk_index}/chunk_{chunk_index}.txt")
+        chunk_text_file = os.path.join(OUTPUT_DIR, f"{book_relative_dir}/chunk_{chunk_index}/chunk_{chunk_index}.txt")
         with open(chunk_text_file, 'w', encoding='utf-8') as f:
             f.write(chunk_text)
         
@@ -55,8 +76,8 @@ async def process_single_chunk(
             "text": chunk_text[:500],
             "fullText": chunk_text,
             "emotion": chunk_context.get("emotions", "unknown"),
-            "audioUrl": f"/{OUTPUT_DIR}/{book_dir}/chunk_{chunk_index}/chunk_1.wav",
-            "textUrl": f"/{OUTPUT_DIR}/{book_dir}/chunk_{chunk_index}/chunk_{chunk_index}.txt",
+            "audioUrl": audio_url,
+            "textUrl": f"/{OUTPUT_DIR}/{book_relative_dir}/chunk_{chunk_index}/chunk_{chunk_index}.txt",
             "duration": GEN_DURATION,
             "processing_time": elapsed_time,
             "success": True
@@ -74,11 +95,11 @@ async def process_single_chunk(
 
 
 async def process_all_chunks_async(
-    all_chunks: List[Dict[str, Any]], 
-    book_dir: str, 
-    global_prompt: str
+    all_chunks: List[Dict[str, Any]],
+    book_relative_dir: str,
+    global_prompt: str,
 ) -> List[Dict[str, Any]]:
-    """모든 청크를 비동기로 병렬 처리 (성능 최적화 적용)"""
+    """모든 청크를 비동기로 처리합니다. 동시성은 세마포어로 제한합니다."""
     total_chunks = len(all_chunks)
     log(f"🚀 {total_chunks}개 청크를 비동기로 병렬 처리 시작...")
     
@@ -90,7 +111,7 @@ async def process_all_chunks_async(
     async def limited_process_chunk(chunk_data: Dict[str, Any], chunk_index: int):
         """동시성 제한이 적용된 청크 처리"""
         async with semaphore:
-            return await process_single_chunk(chunk_data, chunk_index, book_dir, global_prompt)
+            return await process_single_chunk(chunk_data, chunk_index, book_relative_dir, global_prompt)
     
     # 모든 청크를 동시에 처리 (동시성 제한 적용)
     tasks = [

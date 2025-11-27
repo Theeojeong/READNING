@@ -1,16 +1,19 @@
 import asyncio
-from typing import Dict, Any, List, TypedDict, Annotated
+from typing import Dict, Any, List, TypedDict
 from langgraph.graph import StateGraph, END
-from langgraph.graph.message import add_messages
-from langgraph.prebuilt import ToolNode
 from services.split_text import split_text_with_sliding_window
-from services.model_manager import ollama_manager
 from services.analyze_emotions_with_gpt import EmotionAnalysisResult, analyze_emotions_with_gpt
 from services.async_music_generation import process_all_chunks_async
 from services.mysql_service import mysql_service
 from services import prompt_service
 from utils.logger import log
-from config import GEN_DURATION
+from config import (
+    GEN_DURATION,
+    CHUNKS_PER_PAGE,
+    MAX_CONCURRENT_EMOTION_ANALYSIS,
+    MIN_CHUNK_SIZE,
+    MAX_CHUNK_SIZE
+)
 
 
 class WorkflowState(TypedDict):
@@ -76,11 +79,11 @@ class MusicGenerationWorkflow:
         log("📖 LangGraph: 텍스트 분리 시작")
         
         try:
-            # 슬라이딩 윈도우로 텍스트 분리
+            # 슬라이딩 윈도우로 텍스트 분리 (성능 최적화)
             physical_chunks = split_text_with_sliding_window(
                 state["text"], 
-                max_size=6000, 
-                overlap=600
+                max_size=5000,  # num_ctx에 맞춘 최대 청크 크기
+                overlap=300     # 문맥 유지를 위한 오버랩
             )
             
             elapsed_time = time.time() - start_time
@@ -107,31 +110,31 @@ class MusicGenerationWorkflow:
         log(f"🎭 LangGraph: {len(state['physical_chunks'])}개 청크 감정 분석 시작")
         
         try:
-            # 글로벌 프롬프트 생성
-            global_prompt = prompt_service.generate_global(state["text"])
-            
-            # 모든 청크를 비동기로 감정 분석
-            emotion_analyses = []
-            for i, chunk in enumerate(state["physical_chunks"]):
-                try:
-                    # 기존 analyze_emotions_with_gpt 함수 사용
-                    result = analyze_emotions_with_gpt(chunk)
-                    
-                    emotion_analyses.append({
-                        "chunk_index": i,
-                        "text": chunk,
-                        "analysis": result,
-                        "success": True
-                    })
-                    
-                except Exception as e:
-                    log(f"❌ 청크 {i} 감정 분석 실패: {e}")
-                    emotion_analyses.append({
-                        "chunk_index": i,
-                        "text": chunk,
-                        "error": str(e),
-                        "success": False
-                    })
+            # 모든 청크를 비동기로 감정 분석 (동시성 제한)
+            semaphore = asyncio.Semaphore(MAX_CONCURRENT_EMOTION_ANALYSIS)
+
+            async def analyze_one(i: int, chunk_text: str) -> Dict[str, Any]:
+                async with semaphore:
+                    try:
+                        # 동기 함수를 스레드 풀로 실행하여 병렬화
+                        result = await asyncio.to_thread(analyze_emotions_with_gpt, chunk_text)
+                        return {
+                            "chunk_index": i,
+                            "text": chunk_text,
+                            "analysis": result,
+                            "success": True,
+                        }
+                    except Exception as e:
+                        log(f"❌ 청크 {i} 감정 분석 실패: {e}")
+                        return {
+                            "chunk_index": i,
+                            "text": chunk_text,
+                            "error": str(e),
+                            "success": False,
+                        }
+
+            tasks = [analyze_one(i, chunk) for i, chunk in enumerate(state["physical_chunks"])]
+            emotion_analyses = await asyncio.gather(*tasks)
             
             elapsed_time = time.time() - start_time
             successful_count = len([a for a in emotion_analyses if a["success"]])
@@ -154,64 +157,126 @@ class MusicGenerationWorkflow:
         """3단계: 감정 분석 결과를 기반으로 최종 청크 생성"""
         import time
         start_time = time.time()
-        
+
         log("✂️ LangGraph: 최종 청크 생성 시작")
-        
+
         try:
             final_chunks = []
+            skipped_chunks = 0
+            merged_chunks = 0
+
             for analysis in state["emotion_analyses"]:
-                if analysis["success"]:
-                    emotional_phases = analysis["analysis"].get("emotional_phases", [])
-                    
-                    if emotional_phases:
-                        # 감정 전환점이 있으면 세분화
-                        chunk_text = analysis["text"]
-                        last_pos = 0
-                        
-                        for phase in emotional_phases:
-                            phase_pos = phase.get("position_in_full_text", 0)
-                            if phase_pos > last_pos:
-                                sub_chunk = chunk_text[last_pos:phase_pos].strip()
-                                if sub_chunk and len(sub_chunk) > 10:
-                                    final_chunks.append({
-                                        "text": sub_chunk,
-                                        "context": {
-                                            "emotions": phase.get("emotions_before", "unknown"),
-                                            "transition": phase.get("emotions_after", "unknown"),
-                                            "significance": phase.get("significance", 1),
-                                            "explanation": phase.get("explanation", "")
-                                        }
-                                    })
-                                last_pos = phase_pos
-                        
-                        # 마지막 부분 처리
-                        if last_pos < len(chunk_text):
-                            final_chunk = chunk_text[last_pos:].strip()
-                            if final_chunk and len(final_chunk) > 10:
-                                final_chunks.append({
-                                    "text": final_chunk,
-                                    "context": {
-                                        "emotions": emotional_phases[-1].get("emotions_after", "unknown")
-                                    }
-                                })
-                    else:
-                        # 감정 전환점이 없으면 전체 청크 사용
+                if not analysis["success"]:
+                    log(f"⚠️ 분석 실패한 청크 건너뜀")
+                    skipped_chunks += 1
+                    continue
+
+                emotional_phases = analysis["analysis"].get("emotional_phases", [])
+                chunk_text = analysis["text"]
+
+                # 감정 전환점이 없으면 전체를 하나의 청크로
+                if not emotional_phases:
+                    if MIN_CHUNK_SIZE <= len(chunk_text) <= MAX_CHUNK_SIZE:
                         final_chunks.append({
-                            "text": analysis["text"],
+                            "text": chunk_text,
                             "context": {"emotions": "neutral"}
                         })
-            
+                    else:
+                        log(f"⚠️ 청크 크기 초과 ({len(chunk_text)}자), 건너뜀")
+                        skipped_chunks += 1
+                    continue
+
+                # 감정 전환점으로 세분화
+                # position_in_full_text가 None인 항목 필터링
+                valid_phases = [p for p in emotional_phases if p.get("position_in_full_text") is not None]
+
+                if not valid_phases:
+                    log(f"⚠️ 유효한 position이 없음, 전체 청크 사용")
+                    if MIN_CHUNK_SIZE <= len(chunk_text) <= MAX_CHUNK_SIZE:
+                        final_chunks.append({
+                            "text": chunk_text,
+                            "context": {"emotions": "neutral"}
+                        })
+                    continue
+
+                last_pos = 0
+                temp_chunks = []
+
+                for phase in valid_phases:
+                    phase_pos = phase.get("position_in_full_text", 0)
+
+                    if phase_pos <= last_pos:
+                        log(f"⚠️ 잘못된 위치 순서: {phase_pos} <= {last_pos}, 건너뜀")
+                        continue
+
+                    sub_chunk_text = chunk_text[last_pos:phase_pos].strip()
+
+                    # 최소 크기 검증
+                    if len(sub_chunk_text) < MIN_CHUNK_SIZE:
+                        log(f"⚠️ 너무 작은 청크 ({len(sub_chunk_text)}자), 다음 청크와 병합 예정")
+                        # 다음 청크와 병합을 위해 last_pos를 업데이트하지 않음
+                        continue
+
+                    # 최대 크기 검증
+                    if len(sub_chunk_text) > MAX_CHUNK_SIZE:
+                        log(f"⚠️ 너무 큰 청크 ({len(sub_chunk_text)}자), 분할 필요")
+                        # TODO: 큰 청크를 더 작은 단위로 분할하는 로직 추가 가능
+                        skipped_chunks += 1
+                        last_pos = phase_pos
+                        continue
+
+                    temp_chunks.append({
+                        "text": sub_chunk_text,
+                        "context": {
+                            "emotions": phase.get("emotions_before", "unknown"),
+                            "transition": phase.get("emotions_after", "unknown"),
+                            "significance": phase.get("significance", 1),
+                            "explanation": phase.get("explanation", "")
+                        }
+                    })
+                    last_pos = phase_pos
+
+                # 마지막 남은 부분 처리
+                if last_pos < len(chunk_text):
+                    final_text = chunk_text[last_pos:].strip()
+
+                    if len(final_text) >= MIN_CHUNK_SIZE:
+                        if len(final_text) <= MAX_CHUNK_SIZE:
+                            temp_chunks.append({
+                                "text": final_text,
+                                "context": {
+                                    "emotions": valid_phases[-1].get("emotions_after", "unknown") if valid_phases else "neutral"
+                                }
+                            })
+                        else:
+                            log(f"⚠️ 마지막 청크 크기 초과 ({len(final_text)}자)")
+                            skipped_chunks += 1
+                    elif temp_chunks:
+                        # 너무 작으면 이전 청크와 병합
+                        log(f"✂️ 마지막 청크가 작아서 이전 청크와 병합 ({len(final_text)}자)")
+                        temp_chunks[-1]["text"] += " " + final_text
+                        merged_chunks += 1
+
+                final_chunks.extend(temp_chunks)
+
+            # 통계 로깅
             elapsed_time = time.time() - start_time
-            log(f"✅ LangGraph: 최종 청크 생성 완료 - {len(final_chunks)}개 청크 ({elapsed_time:.2f}초)")
-            
+            log(f"✅ LangGraph: 최종 청크 생성 완료")
+            log(f"   - 생성: {len(final_chunks)}개")
+            log(f"   - 건너뜀: {skipped_chunks}개")
+            log(f"   - 병합: {merged_chunks}개")
+            log(f"   - 소요시간: {elapsed_time:.2f}초")
+
             return {
                 **state,
                 "final_chunks": final_chunks,
                 "processing_times": {**state.get("processing_times", {}), "create_final_chunks": elapsed_time}
             }
-            
+
         except Exception as e:
             log(f"❌ LangGraph: 최종 청크 생성 실패 - {e}")
+            import traceback
+            log(f"   스택 트레이스: {traceback.format_exc()}")
             return {
                 **state,
                 "errors": state.get("errors", []) + [f"최종 청크 생성 실패: {e}"]
@@ -259,9 +324,8 @@ class MusicGenerationWorkflow:
         log("📄 LangGraph: 페이지 매핑 생성 시작")
         
         try:
-            # 페이지별 청크 매핑 생성 (한 페이지당 4개 청크 고정)
-            page_chunk_mapping = {}
-            CHUNKS_PER_PAGE = 4
+            # 페이지별 청크 매핑 생성 (한 페이지당 고정 청크 수)
+            page_chunk_mapping: Dict[int, Dict[str, Any]] = {}
             
             for i, chunk in enumerate(state["chunk_metadata"]):
                 page_num = (i // CHUNKS_PER_PAGE) + 1
@@ -299,7 +363,7 @@ class MusicGenerationWorkflow:
         log("💾 LangGraph: DB 저장 시작")
         
         try:
-            page_results = []
+            page_results: List[Dict[str, Any]] = []
             
             for page_num, mapping in state["page_chunk_mapping"].items():
                 start_idx = mapping["start_index"] - 1

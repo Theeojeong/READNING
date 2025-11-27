@@ -9,7 +9,7 @@ services:
       MYSQL_USER: readning_user
       MYSQL_PASSWORD: readning_pass
     ports:
-      - "3307:3306"  # 호스트:3307 -> 컨테이너:3306
+      - "3307:3306" # 호스트:3307 -> 컨테이너:3306
     volumes:
       - ./mysql-data:/var/lib/mysql
       - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
@@ -29,3 +29,30 @@ services:
     depends_on:
       - mysql
 
+  backend:
+    build: .
+    container_name: readning-backend
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - ./gen_musics:/app/gen_musics
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_USER=readning_user
+      - MYSQL_PASSWORD=readning_pass
+      - MYSQL_DATABASE=readning
+      - DATABASE_URL=mysql+pymysql://readning_user:readning_pass@mysql:3306/readning
+    depends_on:
+      - mysql
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build: ./frontend
+    container_name: readning-frontend
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend

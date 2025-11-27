@@ -1,10 +1,18 @@
 import styled from "styled-components";
 import { useEffect, useState } from "react";
-import { collection, getDocs, getFirestore } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  getFirestore,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
 import { app } from "@/utils/firebase";
 import { useNavigate } from "react-router-dom";
-import { getAllReadingProgress, getProgressColor } from "@/utils/readingProgress";
-import MusicPreferenceModal from "./MusicPreferenceModal";
+import {
+  getAllReadingProgress,
+  getProgressColor,
+} from "@/utils/readingProgress";
 
 type Book = {
   id: string;
@@ -29,7 +37,6 @@ export default function BookshelfSection() {
   const [recBooks, setRecBooks] = useState<Book[]>([]);
   const [userBooks, setUserBooks] = useState<Book[]>([]);
   const [readingProgress, setReadingProgress] = useState<any>({});
-  const [showMusicModal, setShowMusicModal] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -70,15 +77,30 @@ export default function BookshelfSection() {
     navigate(`/read/${book.id}`, { state: { book } });
   };
 
+  const handleDeleteBook = async (e: React.MouseEvent, bookId: string) => {
+    e.stopPropagation(); // 카드 클릭 이벤트 전파 방지
+
+    if (!window.confirm("정말 이 책을 삭제하시겠습니까?")) return;
+
+    const uid = localStorage.getItem("user_uid");
+    if (!uid) return;
+
+    try {
+      await deleteDoc(doc(db, "users", uid, "books", bookId));
+      setUserBooks((prev) => prev.filter((b) => b.id !== bookId));
+      alert("책이 삭제되었습니다.");
+    } catch (error) {
+      console.error("책 삭제 실패:", error);
+      alert("책 삭제 중 오류가 발생했습니다.");
+    }
+  };
+
   return (
     <Wrapper>
       <Header>
         <SectionTitle>📁 사용자가 추가한 책 목록</SectionTitle>
-        <MusicButton onClick={() => setShowMusicModal(true)}>
-          🎵 음악 취향 설정
-        </MusicButton>
       </Header>
-      
+
       <SliderContainer>
         {userBooks.map((book) => {
           const progress = readingProgress[book.id];
@@ -90,15 +112,16 @@ export default function BookshelfSection() {
                 />
                 {progress && (
                   <ProgressOverlay>
-                    <ProgressBar 
+                    <ProgressBar
                       percentage={progress.progressPercentage}
                       color={getProgressColor(progress.progressPercentage)}
                     />
-                    <ProgressText>
-                      {progress.progressPercentage}%
-                    </ProgressText>
+                    <ProgressText>{progress.progressPercentage}%</ProgressText>
                   </ProgressOverlay>
                 )}
+                <DeleteButton onClick={(e) => handleDeleteBook(e, book.id)}>
+                  🗑️
+                </DeleteButton>
               </BookCoverContainer>
               <BookInfo>
                 <strong>{book.title}</strong>
@@ -124,16 +147,16 @@ export default function BookshelfSection() {
           return (
             <BookCard key={book.id} onClick={() => handleBookClick(book)}>
               <BookCoverContainer>
-                <BookCover style={{ backgroundImage: `url(${book.coverUrl})` }} />
+                <BookCover
+                  style={{ backgroundImage: `url(${book.coverUrl})` }}
+                />
                 {progress && (
                   <ProgressOverlay>
-                    <ProgressBar 
+                    <ProgressBar
                       percentage={progress.progressPercentage}
                       color={getProgressColor(progress.progressPercentage)}
                     />
-                    <ProgressText>
-                      {progress.progressPercentage}%
-                    </ProgressText>
+                    <ProgressText>{progress.progressPercentage}%</ProgressText>
                   </ProgressOverlay>
                 )}
               </BookCoverContainer>
@@ -150,14 +173,6 @@ export default function BookshelfSection() {
           );
         })}
       </GridContainer>
-      
-      <MusicPreferenceModal
-        isOpen={showMusicModal}
-        onClose={() => setShowMusicModal(false)}
-        onSave={(preferences) => {
-          console.log("음악 취향 저장됨:", preferences);
-        }}
-      />
     </Wrapper>
   );
 }
@@ -414,7 +429,7 @@ const ProgressOverlay = styled.div`
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(transparent, rgba(0,0,0,0.8));
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
   border-radius: 0 0 6px 6px;
   padding: 0.5rem;
   display: flex;
@@ -425,16 +440,16 @@ const ProgressOverlay = styled.div`
 const ProgressBar = styled.div<{ percentage: number; color: string }>`
   flex: 1;
   height: 4px;
-  background: rgba(255,255,255,0.3);
+  background: rgba(255, 255, 255, 0.3);
   border-radius: 2px;
   overflow: hidden;
-  
+
   &::after {
-    content: '';
+    content: "";
     display: block;
-    width: ${props => props.percentage}%;
+    width: ${(props) => props.percentage}%;
     height: 100%;
-    background: ${props => props.color};
+    background: ${(props) => props.color};
     border-radius: 2px;
     transition: width 0.3s ease;
   }
@@ -449,7 +464,7 @@ const ProgressText = styled.span`
 
 const BookInfo = styled.div`
   padding: 0.2rem 0;
-  
+
   strong {
     display: block;
     font-size: 1rem;
@@ -477,7 +492,7 @@ const BookInfo = styled.div`
       font-size: 0.8rem;
     }
   }
-  
+
   small {
     display: block;
     font-size: 0.85rem;
@@ -529,6 +544,35 @@ const ProgressInfo = styled.div`
   @media (max-width: 320px) {
     font-size: 0.6rem;
     padding: 0.1rem 0.3rem;
+  }
+`;
+
+const DeleteButton = styled.button`
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+  z-index: 10;
+  opacity: 0;
+
+  ${BookCard}:hover & {
+    opacity: 1;
+  }
+
+  &:hover {
+    transform: scale(1.1);
+    background: #ffe3e3;
   }
 `;
 

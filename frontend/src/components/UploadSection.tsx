@@ -3,6 +3,7 @@ import styled from "styled-components";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/utils/firebase";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { axiosInstance } from "../api/axiosInstance";
 
 export default function UploadSection() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -11,7 +12,6 @@ export default function UploadSection() {
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
-  const [musicPreferences, setMusicPreferences] = useState<string[]>([]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -44,25 +44,20 @@ export default function UploadSection() {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("book_id", id);
-    formData.append("preference", JSON.stringify(musicPreferences));
+    formData.append("user_name", uid);
+    formData.append("book_title", title);
 
     console.log(file);
     console.log(id);
-    console.log(musicPreferences);
-    console.log(JSON.stringify(musicPreferences));
 
     try {
-      const res = await fetch(
-        "https://rjnrbqepcwsbaegk.tunnel.elice.io/proxy/8000/generate/music-v3",
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
+      const res = await axiosInstance.post("/generate/music-v3", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
-      if (!res.ok) throw new Error("AI 서버 응답 실패");
-
-      const { chapters } = await res.json(); // 📥 챕터 정보 자동 생성 결과
+      const { chapters } = res.data; // 📥 챕터 정보 자동 생성 결과
 
       // 1️⃣ Firebase Storage에 업로드
       const storage = getStorage();
@@ -91,19 +86,12 @@ export default function UploadSection() {
     }
   };
 
-  const musicOptions = [
-    "잔잔한 피아노",
-    "자연 소리",
-    "클래식",
-    "재즈",
-    "일렉트로닉",
-    "몰입형 사운드",
-  ];
-
   return (
     <Wrapper>
       <Title>📚 새로운 책 추가하기</Title>
-      <Subtitle>PDF, TXT, EPUB 파일을 업로드하고 AI 음악과 함께 독서를 시작하세요</Subtitle>
+      <Subtitle>
+        PDF, TXT, EPUB 파일을 업로드하고 AI 음악과 함께 독서를 시작하세요
+      </Subtitle>
       <DropZone
         onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
           e.preventDefault();
@@ -114,14 +102,18 @@ export default function UploadSection() {
           if (dropped) {
             const validTypes = [
               "application/pdf",
-              "text/plain", 
-              "application/epub+zip"
+              "text/plain",
+              "application/epub+zip",
             ];
-            const ext = dropped.name.slice(dropped.name.lastIndexOf(".")).toLowerCase();
+            const ext = dropped.name
+              .slice(dropped.name.lastIndexOf("."))
+              .toLowerCase();
             const validExtensions = [".pdf", ".txt", ".epub"];
-            
-            const isValid = validTypes.includes(dropped.type) || validExtensions.includes(ext);
-            
+
+            const isValid =
+              validTypes.includes(dropped.type) ||
+              validExtensions.includes(ext);
+
             if (isValid) {
               setFile(dropped);
               setShowModal(true);
@@ -169,28 +161,6 @@ export default function UploadSection() {
               value={coverUrl}
               onChange={(e) => setCoverUrl(e.target.value)}
             />
-
-            <h4>🎧 원하는 음악 스타일 선택</h4>
-            <CheckboxGroup>
-              {musicOptions.map((option) => (
-                <label key={option}>
-                  <input
-                    type="checkbox"
-                    checked={musicPreferences.includes(option)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setMusicPreferences([...musicPreferences, option]);
-                      } else {
-                        setMusicPreferences(
-                          musicPreferences.filter((o) => o !== option)
-                        );
-                      }
-                    }}
-                  />
-                  {option}
-                </label>
-              ))}
-            </CheckboxGroup>
 
             <SubmitBtn onClick={handleSubmit}>✅ 저장하기</SubmitBtn>
           </Modal>
@@ -269,7 +239,11 @@ const DropZone = styled.div`
   padding: 4rem 2rem;
   border: 2px dashed #667eea;
   border-radius: 20px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(102, 126, 234, 0.05) 0%,
+    rgba(118, 75, 162, 0.05) 100%
+  );
   transition: all 0.3s ease;
   text-align: center;
   position: relative;
@@ -299,18 +273,26 @@ const DropZone = styled.div`
 
   &:hover {
     border-color: #764ba2;
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    background: linear-gradient(
+      135deg,
+      rgba(102, 126, 234, 0.1) 0%,
+      rgba(118, 75, 162, 0.1) 100%
+    );
     transform: translateY(-2px);
   }
 
   &::before {
-    content: '';
+    content: "";
     position: absolute;
     top: -50%;
     left: -50%;
     width: 200%;
     height: 200%;
-    background: conic-gradient(transparent, rgba(102, 126, 234, 0.1), transparent 30%);
+    background: conic-gradient(
+      transparent,
+      rgba(102, 126, 234, 0.1),
+      transparent 30%
+    );
     animation: rotate 4s linear infinite;
     z-index: 0;
   }
@@ -321,8 +303,12 @@ const DropZone = styled.div`
   }
 
   @keyframes rotate {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
   }
 `;
 
@@ -460,10 +446,12 @@ const ModalBackdrop = styled.div`
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.4);
+  z-index: 9999;
 `;
 
 const Modal = styled.div`
   background: white;
+  z-index: 10000;
   padding: 2rem;
   width: 400px;
   max-width: 90vw;

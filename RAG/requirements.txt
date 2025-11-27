@@ -1,0 +1,13 @@
+# RAG 시스템 필수 패키지
+
+# 벡터 데이터베이스
+chromadb>=0.4.0
+
+# 임베딩 모델
+sentence-transformers>=2.2.0
+
+# 데이터 검증
+pydantic>=2.0.0
+
+# 기타 의존성
+numpy>=1.24.0

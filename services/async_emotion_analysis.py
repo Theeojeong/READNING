@@ -23,6 +23,7 @@ async def analyze_chunk_emotion_async(chunk_text: str, chunk_index: int) -> Dict
         log(f"🎭 청크 {chunk_index} 감정 분석 시작 (길이: {len(chunk_text)}자)")
         
         # 기존 analyze_emotions_with_gpt를 비동기로 실행
+        log(f"📝 청크 {chunk_index} LLM 분석 요청 시작")
         loop = asyncio.get_event_loop()
         with ThreadPoolExecutor() as executor:
             analysis = await loop.run_in_executor(
@@ -30,6 +31,7 @@ async def analyze_chunk_emotion_async(chunk_text: str, chunk_index: int) -> Dict
                 analyze_emotions_with_gpt, 
                 chunk_text
             )
+        log(f"📝 청크 {chunk_index} LLM 분석 요청 완료")
         
         elapsed_time = time.time() - start_time
         log(f"✅ 청크 {chunk_index} 감정 분석 완료 ({elapsed_time:.2f}초)")
@@ -128,8 +130,8 @@ async def process_book_with_async_emotion_detection(
     log("📖 비동기 감정 분석 워크플로우 시작")
     start_time = time.time()
     
-    # 1단계: 물리적 청크 분리 (슬라이딩 윈도우)
-    physical_chunks = split_text_with_sliding_window(text, max_size=6000, overlap=600)
+    # 1단계: 물리적 청크 분리 (슬라이딩 윈도우, 성능 최적화)
+    physical_chunks = split_text_with_sliding_window(text, max_size=1500, overlap=150)
     log(f"📖 물리적 청크 분리 완료: {len(physical_chunks)}개")
     
     # 2단계: 모든 청크를 동시다발적으로 감정 분석
