@@ -22,6 +22,7 @@ MAX_CHUNK_SIZE = 8000               # 최대 청크 크기 (문자 수, 음악 �
 class Settings(BaseSettings):
     MODEL_NAME: str = "gpt-4o-mini"
     OPENAI_API_KEY: str = ""
+    REPLICATE_API_TOKEN: str = ""
     DEBUG: bool = True
     LOG_LLM_RESPONSES: bool = True
     PRINT_CHUNK_TEXT: bool = True
@@ -36,6 +37,7 @@ settings = Settings()
 # 호환용 전역 별칭
 MODEL_NAME = settings.MODEL_NAME
 OPENAI_API_KEY = settings.OPENAI_API_KEY
+REPLICATE_API_TOKEN = settings.REPLICATE_API_TOKEN
 DEBUG = settings.DEBUG
 LOG_LLM_RESPONSES = settings.LOG_LLM_RESPONSES
 PRINT_CHUNK_TEXT = settings.PRINT_CHUNK_TEXT

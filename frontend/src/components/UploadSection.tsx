@@ -5,7 +5,17 @@ import { db } from "@/utils/firebase";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { axiosInstance } from "../api/axiosInstance";
 
-export default function UploadSection() {
+type Props = {
+  onUploadSuccess?: () => void;
+  setUploadingBook?: (
+    book: { title: string; author: string; coverUrl: string } | null
+  ) => void;
+};
+
+export default function UploadSection({
+  onUploadSuccess,
+  setUploadingBook,
+}: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -50,6 +60,16 @@ export default function UploadSection() {
     console.log(file);
     console.log(id);
 
+    // 로딩 상태 시작
+    // 로딩 상태 시작
+    if (setUploadingBook) {
+      setUploadingBook({
+        title: title || "제목 없음",
+        author: author || "작자 미상",
+        coverUrl: coverUrl || "",
+      });
+    }
+
     try {
       const res = await axiosInstance.post("/generate/music-v3", formData, {
         headers: {
@@ -80,6 +100,7 @@ export default function UploadSection() {
 
       alert("✅ 업로드 완료!");
       setShowModal(false);
+      if (onUploadSuccess) onUploadSuccess();
     } catch (err) {
       console.error("❌ 에러 발생:", err);
       alert("업로드 중 오류가 발생했습니다.");

@@ -5,13 +5,33 @@ import IntroSection from "../components/IntroSection";
 import UploadSection from "../components/UploadSection";
 import BookshelfSection from "../components/BookshelfSection";
 
+import { useState } from "react";
+
 export default function MainPage() {
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [uploadingBook, setUploadingBook] = useState<{
+    title: string;
+    author: string;
+    coverUrl: string;
+  } | null>(null);
+
+  const handleUploadSuccess = () => {
+    setRefreshTrigger((prev) => prev + 1);
+    setUploadingBook(null); // 업로드 완료 시 로딩 상태 해제
+  };
+
   return (
     <PageLayout>
       <Navbar />
       <IntroSection />
-      <UploadSection />
-      <BookshelfSection />
+      <UploadSection
+        onUploadSuccess={handleUploadSuccess}
+        setUploadingBook={setUploadingBook}
+      />
+      <BookshelfSection
+        refreshTrigger={refreshTrigger}
+        uploadingBook={uploadingBook}
+      />
       <Footer />
     </PageLayout>
   );

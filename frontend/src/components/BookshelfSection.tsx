@@ -33,11 +33,25 @@ type Book = {
 
 const db = getFirestore(app);
 
-export default function BookshelfSection() {
+type Props = {
+  refreshTrigger?: number;
+  uploadingBook?: {
+    title: string;
+    author: string;
+    coverUrl: string;
+  } | null;
+};
+
+export default function BookshelfSection({
+  refreshTrigger = 0,
+  uploadingBook,
+}: Props) {
   const [recBooks, setRecBooks] = useState<Book[]>([]);
   const [userBooks, setUserBooks] = useState<Book[]>([]);
   const [readingProgress, setReadingProgress] = useState<any>({});
   const navigate = useNavigate();
+
+  console.log("BookshelfSection render: uploadingBook =", uploadingBook);
 
   useEffect(() => {
     const fetchBooks = async () => {
@@ -54,9 +68,17 @@ export default function BookshelfSection() {
 
       try {
         const snapshot = await getDocs(collection(db, "users", uid, "books")); // Firestore에서 해당 유저 경로의 books 컬렉션 불러옴
-        const userUploadedBooks = snapshot.docs.map(
-          (doc) => ({ id: doc.id, ...doc.data() } as Book)
-        );
+        const userUploadedBooks = snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() } as Book))
+          .sort((a, b) => {
+            const dateA = a.createdAt?.toDate
+              ? a.createdAt.toDate()
+              : new Date(a.createdAt);
+            const dateB = b.createdAt?.toDate
+              ? b.createdAt.toDate()
+              : new Date(b.createdAt);
+            return dateB - dateA; // 최신순 정렬
+          });
         setUserBooks(userUploadedBooks);
       } catch (e) {
         console.error("유저 책 불러오기 실패:", e);
@@ -71,7 +93,7 @@ export default function BookshelfSection() {
     fetchBooks();
     fetchUserBooks();
     fetchProgress();
-  }, []);
+  }, [refreshTrigger]);
 
   const handleBookClick = (book: Book) => {
     navigate(`/read/${book.id}`, { state: { book } });
@@ -102,6 +124,28 @@ export default function BookshelfSection() {
       </Header>
 
       <SliderContainer>
+        {/* 로딩 중인 책 표시 */}
+        {uploadingBook && (
+          <BookCard style={{ cursor: "default" }}>
+            <BookCoverContainer>
+              <BookCover
+                style={{
+                  backgroundImage: `url(${uploadingBook.coverUrl || ""})`,
+                  opacity: 0.5,
+                }}
+              />
+              <LoadingOverlay>
+                <Spinner />
+                <span>음악 생성 중...</span>
+              </LoadingOverlay>
+            </BookCoverContainer>
+            <BookInfo>
+              <strong>{uploadingBook.title}</strong>
+              <small>{uploadingBook.author}</small>
+            </BookInfo>
+          </BookCard>
+        )}
+
         {userBooks.map((book) => {
           const progress = readingProgress[book.id];
           return (
@@ -616,5 +660,34 @@ const GridContainer = styled.div`
   @media (max-width: 320px) {
     padding: 0.3rem 0;
     gap: 0.5rem;
+  }
+`;
+
+const LoadingOverlay = styled.div`
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.8rem;
+  gap: 0.5rem;
+  z-index: 5;
+`;
+
+const Spinner = styled.div`
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 `;

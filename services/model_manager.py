@@ -1,6 +1,5 @@
 """모델 관리자 - 싱글톤 패턴으로 모델 재사용"""
 import ollama
-from audiocraft.models import MusicGen
 from typing import Optional, Type
 from utils.logger import log
 from config import MODEL_NAME, GEN_DURATION
@@ -10,7 +9,7 @@ from pydantic import BaseModel
 
 from langchain_openai import ChatOpenAI
 from openai import OpenAI
-from config import OPENAI_API_KEY
+from config import OPENAI_API_KEY, REPLICATE_API_TOKEN
 
 class OpenAIManager:
     """OpenAI 연결 관리 싱글톤"""
@@ -88,36 +87,30 @@ class OpenAIManager:
 
 
 class MusicGenManager:
-    """MusicGen 모델 관리 싱글톤"""
+    """Replicate MusicGen 클라이언트 관리 싱글톤"""
     _instance: Optional['MusicGenManager'] = None
-    _model: Optional[MusicGen] = None
-    _sample_rate: Optional[int] = None
+    _client = None
     
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
     
-    def get_model(self) -> MusicGen:
-        """MusicGen 모델 반환 (싱글톤 보장)"""
-        if self._model is None:
-            log("🎵 MusicGen 모델 로딩 중... (싱글톤)")
+    def __init__(self):
+        """Replicate 클라이언트 초기화"""
+        if not hasattr(self, '_initialized'):
             try:
-                self._model = MusicGen.get_pretrained('facebook/musicgen-melody')
-                self._model.set_generation_params(duration=GEN_DURATION)
-                self._sample_rate = self._model.sample_rate
-                log("✅ MusicGen 모델 로딩 완료")
+                import replicate
+                self._client = replicate.Client(api_token=REPLICATE_API_TOKEN)
+                log("✅ Replicate 클라이언트 초기화 완료")
+                self._initialized = True
             except Exception as e:
-                log(f"❌ MusicGen 모델 로딩 실패: {e}")
-                raise
-        return self._model
+                log(f"❌ Replicate 초기화 실패: {e}")
+                self._initialized = True
     
     @property
-    def sample_rate(self) -> int:
-        """샘플레이트 반환"""
-        if self._sample_rate is None:
-            self.get_model()
-        return self._sample_rate
+    def client(self):
+        return self._client
 
 
 # 싱글톤 인스턴스 생성
